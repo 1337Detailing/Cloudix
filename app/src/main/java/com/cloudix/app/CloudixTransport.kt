@@ -272,7 +272,7 @@ object CloudixNetworkFailure {
             is java.net.SocketTimeoutException -> "Délai dépassé. Vérifie l’adresse Wi-Fi, le pare-feu et l’isolation des appareils sur le routeur."
             is javax.net.ssl.SSLHandshakeException -> "Échec de la connexion sécurisée TLS : ${error.message ?: "certificat ou protocole"}. Essaie le test local sur le Xiaomi et réappaire les téléphones."
             is java.io.EOFException -> "Connexion fermée avant la réponse. Lance le diagnostic TLS sur le Xiaomi."
-            is java.net.SocketException -> "Connexion fermée par le serveur. Lance le diagnostic local sur le Xiaomi (erreur : ${error.message ?: "socket"})."
+            is java.net.SocketException -> "Connexion fermée par le serveur. Vérifie que les deux appareils utilisent la dernière version de Cloudix, puis lance le test TLS local sur le Xiaomi. Détail : ${error.message ?: "socket"}."
             else -> error.message ?: "Erreur de connexion inconnue"
         }
         return CloudixConnectionException(message, error)
