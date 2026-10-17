@@ -79,3 +79,19 @@ Do not open port 8731 to the wider Internet casually. Network-facing encrypted a
 On the Settings screen, tap **Rechercher les builds GitHub**. Cloudix reads a SHA-256 manifest from the `debug-latest` GitHub Release, downloads the signed APK and verifies both the digest and the installed Android signing certificate before offering the system installer.
 
 The CI workflow publishes debug releases **only if the same stable signing secrets are configured** and on push to main. Configure `CLOUDIX_KEYSTORE_B64`, `CLOUDIX_STORE_PASSWORD`, `CLOUDIX_KEY_PASSWORD`, and `CLOUDIX_KEY_ALIAS` as detailed in [SIGNING.md](SIGNING.md). Without these secrets the updater will not find a public build. Old ephemeral GitHub-debug signatures cannot update in place and require one final reinstall to the stable signing identity.
+
+## Cloudix with Tailscale (Wi-Fi at home, 5G anywhere, no box access)
+
+**Recommended for blocked inbound IPv6.** Install the **free Tailscale Android app** on both Xiaomi (server) and Vivo (client), sign in with **the same Tailscale account** and activate the VPN on both. You do not need root, Termux, a router configuration or a rented server.
+
+1. Start Cloudix Server on Xiaomi; enable Tailscale.
+2. Read the Xiaomi **Tailscale** IPv4 address in its Tailscale app (typically `100.x.y.z`). **Never substitute the Vivo's address.**
+3. In Cloudix Xiaomi server home → **Tailscale · Connexion 5G**, let automatic detection fill the address or manually type the address; tap **Enregistrer**. A refreshed Cloudix pairing QR includes the Tailscale endpoint and the existing TLS pin + secret.
+4. On Vivo, enable Tailscale and re-pair with that QR. Alternatively, **Cloudix → Client → VPN Tailscale (5G) → Configurer** accepts Xiaomi's `100.x.y.z` address while retaining the existing pairing secret and certificate pin.
+5. In Vivo Cloudix, tap **Tester** on 5G, then browse and upload files as normal. Cloudix prefers the Tailscale address when it is saved. Tailscale works over mobile data and switches to an encrypted DERP relay if direct NAT traversal fails.
+
+Tailscale's free Personal plan covers a small private network. Tailscale's control plane and encrypted forwarding relay **are third-party infrastructure**, but file bytes remain stored on Xiaomi and the Cloudix TLS stream stays end-to-end encrypted. This does **not** satisfy a strict no-third-party-network-services requirement. Android allows only one device-level VPN at a time. Disable power restrictions for both Cloudix and Tailscale to improve reliability.
+
+**Safety:** Treat Cloudix pairing links as passwords; only share them privately. No port forwarding and no public IP exposure are required. Do not enable Tailscale Funnel (which exposes services publicly). The `100.64.0.0/10` range is shared address space; an address in this range is **not proof** that the remote device is authenticated—Cloudix continues verifying its pinned server certificate and pairing secret.
+
+Official docs: https://tailscale.com/docs/install/android and https://tailscale.com/kb/1452/connect-to-devices
