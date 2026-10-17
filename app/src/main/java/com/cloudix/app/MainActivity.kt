@@ -616,7 +616,7 @@ fun CloudixApp(incoming: String) {
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Spacer(Modifier.height(16.dp))
                                     SettingItem(Icons.Rounded.Wifi, "Wi-Fi uniquement",
-                                        "Éviter les données mobiles") {
+                                        "Désactive pour autoriser les sauvegardes en 4G/5G") {
                                         Switch(settings.wifiOnly, onCheckedChange = {
                                             settings.wifiOnly = it; BackupScheduler.schedule(context); revision++
                                         })
@@ -657,7 +657,7 @@ fun CloudixApp(incoming: String) {
                                             message = "Connecte un serveur et sélectionne au moins un dossier."
                                         } else {
                                             BackupScheduler.runNow(context)
-                                            message = "Sauvegarde demandée. Le système l'exécutera lorsque le Wi-Fi sera disponible."
+                                            message = if (settings.wifiOnly) "Sauvegarde programmée : attente d’un réseau Wi-Fi non facturé." else "Sauvegarde programmée : Wi-Fi ou réseau mobile autorisé. Vérifie que le serveur est accessible."
                                         }
                                     }, modifier = Modifier.fillMaxWidth()) {
                                         Icon(Icons.Rounded.Sync, null)

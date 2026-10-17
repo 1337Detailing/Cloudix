@@ -7,6 +7,7 @@ import androidx.documentfile.provider.DocumentFile
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.ExistingWorkPolicy
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
@@ -36,7 +37,7 @@ object BackupScheduler {
             if (settings.wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED
         ).build()
         WorkManager.getInstance(context).enqueueUniqueWork(
-            "cloudix_manual_backup", androidx.work.ExistingWorkPolicy.KEEP,
+            "cloudix_manual_backup", ExistingWorkPolicy.REPLACE,
             OneTimeWorkRequestBuilder<BackupWorker>().setConstraints(constraints).build()
         )
     }
