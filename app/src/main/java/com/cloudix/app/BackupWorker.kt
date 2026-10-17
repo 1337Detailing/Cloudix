@@ -57,6 +57,7 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             ensure(client, "Backups", device)
             var uploaded = 0
             var inaccessibleDepth = false
+            var skippedLargeOrUnknown = 0
             for (str in settings.backupFolders) {
                 if (isStopped) return Result.retry()
                 val tree = DocumentFile.fromTreeUri(applicationContext, Uri.parse(str)) ?: continue
@@ -81,7 +82,10 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                             pending.addLast(item to ("$remoteDir/$name" to depth + 1))
                         } else if (item.isFile) {
                             val size = item.length()
-                            if (size < 0 || size > 4_294_967_296L) continue
+                            if (size < 0 || size > 4_294_967_296L) {
+                                skippedLargeOrUnknown++
+                                continue
+                            }
                             val id = item.uri.toString()
                             val stamp = "$size:${item.lastModified()}"
                             if (state.optString(id) == stamp) continue
@@ -104,9 +108,10 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                 }
             }
             settings.lastBackupItems = uploaded
-            if (inaccessibleDepth) {
+            if (skippedLargeOrUnknown > 0 || inaccessibleDepth) {
                 settings.lastBackupError =
-                    "Certains dossiers dépassent la profondeur maximale autorisée (28 sous-dossiers)."
+                    "Sauvegarde incomplète : $skippedLargeOrUnknown fichiers trop volumineux ou de taille inconnue" +
+                    (if (inaccessibleDepth) ", et certains sous-dossiers sont trop profonds." else ".")
                 android.util.Log.w("CloudixBackup",
                     settings.lastBackupError)
                 Result.failure()
@@ -121,9 +126,7 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             Result.retry()
         }
     }
-    private fun safeName(name: String): String =
-        name.replace(Regex("[^\\p{L}\\p{N}._() -]"), "_")
-            .trim().take(120).takeUnless { it.isEmpty() || it == "." || it == ".." } ?: "Sans_nom"
+    private fun safeName(name: String): String = CloudixBackupNames.safeName(name)
     private fun ensure(client: CloudixClient, directory: String, name: String) {
         try {
             client.mkdir(directory, name)
