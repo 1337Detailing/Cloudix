@@ -9,7 +9,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -24,8 +24,40 @@ jobs:
           echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
           SDK_MANAGER="$(find /usr/local/lib/android/sdk/cmdline-tools -type f -name sdkmanager | head -n 1)"
           "$SDK_MANAGER" --install "platforms;android-35" "build-tools;35.0.0"
+      - name: Configure stable signing if secrets are available
+        env:
+          CLOUDIX_KEYSTORE_B64: ${{ secrets.CLOUDIX_KEYSTORE_B64 }}
+          CLOUDIX_STORE_PASSWORD: ${{ secrets.CLOUDIX_STORE_PASSWORD }}
+          CLOUDIX_KEY_PASSWORD: ${{ secrets.CLOUDIX_KEY_PASSWORD }}
+          CLOUDIX_KEY_ALIAS: ${{ secrets.CLOUDIX_KEY_ALIAS }}
+        run: |
+          if [[ -n "$CLOUDIX_KEYSTORE_B64" && -n "$CLOUDIX_STORE_PASSWORD" && -n "$CLOUDIX_KEY_PASSWORD" ]]; then
+            printf '%s' "$CLOUDIX_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/cloudix-release.p12"
+            chmod 600 "$RUNNER_TEMP/cloudix-release.p12"
+            echo "CLOUDIX_KEYSTORE_PATH=$RUNNER_TEMP/cloudix-release.p12" >> "$GITHUB_ENV"
+            echo "CLOUDIX_STORE_PASSWORD=$CLOUDIX_STORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "CLOUDIX_KEY_PASSWORD=$CLOUDIX_KEY_PASSWORD" >> "$GITHUB_ENV"
+            echo "CLOUDIX_KEY_ALIAS=${CLOUDIX_KEY_ALIAS:-cloudix}" >> "$GITHUB_ENV"
+            echo "CLOUDIX_SIGNED=true" >> "$GITHUB_ENV"
+          else
+            echo "::notice::No signing secrets: ephemeral debug APK only (not update-compatible)."
+          fi
       - name: Audit and compile debug APK
         run: gradle --no-daemon --stacktrace :app:assembleDebug :app:lintDebug :app:testDebugUnitTest
+      - name: Build upgrade-compatible release APK
+        if: env.CLOUDIX_SIGNED == 'true'
+        run: gradle --no-daemon :app:assembleRelease
+      - name: Verify release signature
+        if: env.CLOUDIX_SIGNED == 'true'
+        run: |
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
+      - name: Upload signed release
+        if: env.CLOUDIX_SIGNED == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cloudix-release-signed
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
       - name: Upload Cloudix APK
         uses: actions/upload-artifact@v4
         with:

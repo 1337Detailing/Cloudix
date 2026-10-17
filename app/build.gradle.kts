@@ -3,6 +3,13 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+// Supply the same private signing key through GitHub Actions secrets for every update.
+val cloudixKeyPath = System.getenv("CLOUDIX_KEYSTORE_PATH")
+val cloudixStorePassword = System.getenv("CLOUDIX_STORE_PASSWORD")
+val cloudixKeyAlias = System.getenv("CLOUDIX_KEY_ALIAS") ?: "cloudix"
+val cloudixKeyPassword = System.getenv("CLOUDIX_KEY_PASSWORD")
+val cloudixSigned = !cloudixKeyPath.isNullOrBlank() &&
+    !cloudixStorePassword.isNullOrBlank() && !cloudixKeyPassword.isNullOrBlank()
 android {
     namespace = "com.cloudix.app"
     compileSdk = 35
@@ -10,12 +17,31 @@ android {
         applicationId = "com.cloudix.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        // Monotonically increasing versionCode prevents update downgrades.
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()?.let { 1000 + it } ?: 2
+        versionName = "0.2.0"
+    }
+    signingConfigs {
+        if (cloudixSigned) {
+            create("cloudixStable") {
+                storeFile = file(cloudixKeyPath!!)
+                storePassword = cloudixStorePassword
+                keyAlias = cloudixKeyAlias
+                keyPassword = cloudixKeyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = true
+            }
+        }
     }
     buildTypes {
+        getByName("debug") {
+            if (cloudixSigned) signingConfig = signingConfigs.getByName("cloudixStable")
+        }
         release {
             isMinifyEnabled = false
+            if (cloudixSigned) signingConfig = signingConfigs.getByName("cloudixStable")
         }
     }
     compileOptions {
