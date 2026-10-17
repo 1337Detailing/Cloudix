@@ -101,9 +101,14 @@ class CloudixSettings(private val context: Context) {
     var animations: Boolean
         get() = appearance.animations
         set(v) = updateAppearance(appearance.copy(animations = v))
+    private var observedSort by mutableStateOf(prefs.getString("sort", "name") ?: "name")
     var sort: String
-        get() = prefs.getString("sort", "name") ?: "name"
-        set(value) = prefs.edit().putString("sort", value).apply()
+        get() = observedSort
+        set(value) {
+            require(value in setOf("name", "size", "date"))
+            observedSort = value
+            prefs.edit().putString("sort", value).apply()
+        }
     var accent: Int
         get() = appearance.accent
         set(v) {
@@ -120,9 +125,14 @@ class CloudixSettings(private val context: Context) {
     }
     fun resetColors() = updateAppearance(appearance.copy(overrides = emptyMap()))
     fun resetAppearance() = updateAppearance(AppearanceSnapshot())
+    private var observedServerAutoStart by mutableStateOf(
+        prefs.getBoolean("server_auto_start", false))
     var serverAutoStart: Boolean
-        get() = prefs.getBoolean("server_auto_start", false)
-        set(value) = prefs.edit().putBoolean("server_auto_start", value).apply()
+        get() = observedServerAutoStart
+        set(value) {
+            observedServerAutoStart = value
+            prefs.edit().putBoolean("server_auto_start", value).apply()
+        }
     var tailscaleAddress: String
         get() = prefs.getString("tailscale_address", "") ?: ""
         set(value) {
@@ -131,12 +141,21 @@ class CloudixSettings(private val context: Context) {
             }
             prefs.edit().putString("tailscale_address", value).apply()
         }
+    private var observedPreferIpv6 by mutableStateOf(
+        prefs.getBoolean("prefer_direct_ipv6", false))
     var preferDirectIpv6: Boolean
-        get() = prefs.getBoolean("prefer_direct_ipv6", false)
-        set(value) = prefs.edit().putBoolean("prefer_direct_ipv6", value).apply()
+        get() = observedPreferIpv6
+        set(value) {
+            observedPreferIpv6 = value
+            prefs.edit().putBoolean("prefer_direct_ipv6", value).apply()
+        }
+    private var observedWifiOnly by mutableStateOf(prefs.getBoolean("wifi_only", true))
     var wifiOnly: Boolean
-        get() = prefs.getBoolean("wifi_only", true)
-        set(v) = prefs.edit().putBoolean("wifi_only", v).apply()
+        get() = observedWifiOnly
+        set(value) {
+            observedWifiOnly = value
+            prefs.edit().putBoolean("wifi_only", value).apply()
+        }
     var lastBackupError: String
         get() = prefs.getString("backup_last_error", "") ?: ""
         set(value) = prefs.edit().putString("backup_last_error", value.take(300)).apply()
@@ -146,12 +165,22 @@ class CloudixSettings(private val context: Context) {
     var lastBackupItems: Int
         get() = prefs.getInt("last_backup_items", 0)
         set(v) = prefs.edit().putInt("last_backup_items", v).apply()
+    private var observedInterval by mutableStateOf(prefs.getLong("interval", 60))
     var interval: Long
-        get() = prefs.getLong("interval", 60)
-        set(v) = prefs.edit().putLong("interval", v).apply()
+        get() = observedInterval
+        set(value) {
+            require(value >= 15)
+            observedInterval = value
+            prefs.edit().putLong("interval", value).apply()
+        }
+    private var observedBackupFolders by mutableStateOf(
+        prefs.getStringSet("backup_folders", emptySet())?.toSet() ?: emptySet())
     var backupFolders: Set<String>
-        get() = prefs.getStringSet("backup_folders", emptySet())?.toSet() ?: emptySet()
-        set(v) = prefs.edit().putStringSet("backup_folders", v.toSet()).apply()
+        get() = observedBackupFolders
+        set(value) {
+            observedBackupFolders = value.toSet()
+            prefs.edit().putStringSet("backup_folders", observedBackupFolders).apply()
+        }
     fun clearBackupState() {
         prefs.edit().putString("backup_state", "").apply()
     }
