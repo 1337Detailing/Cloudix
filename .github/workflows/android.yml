@@ -20,7 +20,10 @@ jobs:
         with:
           gradle-version: '8.13'
       - name: Install Android SDK 35
-        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+        run: |
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
+          SDK_MANAGER="$(find /usr/local/lib/android/sdk/cmdline-tools -type f -name sdkmanager | head -n 1)"
+          "$SDK_MANAGER" --install "platforms;android-35" "build-tools;35.0.0"
       - name: Audit and compile debug APK
         run: gradle --no-daemon --stacktrace :app:assembleDebug :app:lintDebug :app:testDebugUnitTest
       - name: Upload Cloudix APK
