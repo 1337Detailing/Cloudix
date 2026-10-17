@@ -15,6 +15,7 @@ android {
     compileSdk = 35
     defaultConfig {
         applicationId = "com.cloudix.app"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         minSdk = 26
         targetSdk = 35
         // Monotonically increasing versionCode prevents update downgrades.
@@ -73,4 +74,6 @@ dependencies {
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
 }
