@@ -13,7 +13,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -74,6 +80,10 @@ fun CloudixApp(incoming: String) {
     var showFolderDialog by remember { mutableStateOf(false) }
     var pendingDownload by remember { mutableStateOf<RemoteFile?>(null) }
     var pendingDelete by remember { mutableStateOf<RemoteFile?>(null) }
+    var pendingRename by remember { mutableStateOf<RemoteFile?>(null) }
+    var renameName by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf("") }
+    var diagnostic by remember { mutableStateOf("") }
 
     fun report(error: Throwable) { message = error.message ?: "Une erreur s'est produite." }
     suspend fun refresh() {
@@ -175,7 +185,13 @@ fun CloudixApp(incoming: String) {
         } else {
             CloudixScaffold(role, page, { page = it },
                 "Cloudix", if (role == "server") "Ton espace privé" else "Ton cloud, partout") { insets ->
-                Crossfade(page, label = "cloudix-navigation") { tab ->
+                AnimatedContent(targetState = page,
+                    transitionSpec = {
+                        if (settings.animations) {
+                            (fadeIn(tween(260)) + slideInHorizontally(tween(300)) { it / 7 }) togetherWith
+                                (fadeOut(tween(150)) + slideOutHorizontally(tween(220)) { -it / 7 })
+                        } else fadeIn(tween(0)) togetherWith fadeOut(tween(0))
+                    }, label = "cloudix-navigation") { tab ->
                     Box(Modifier.fillMaxSize().padding(insets)) {
                         when (tab) {
                             0 -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -208,7 +224,37 @@ fun CloudixApp(incoming: String) {
                                     }
                                     if (CloudixStatus.error.value.isNotBlank())
                                         Text(CloudixStatus.error.value, color = MaterialTheme.colorScheme.error)
-                                    SectionTitle("Connexion", "Chiffrée TLS")
+                                    if (CloudixStatus.lastConnectionIssue.value.isNotBlank()) {
+                                        ElevatedCard(colors = CardDefaults.elevatedCardColors(
+                                            containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                                            Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                                                Text("Dernière erreur réseau", fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onErrorContainer)
+                                                Text(CloudixStatus.lastConnectionIssue.value,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onErrorContainer)
+                                            }
+                                        }
+                                    }
+                                    SectionTitle("Connexion", "HTTPS + PIN TLS")
+                                    SettingItem(Icons.Rounded.HealthAndSafety, "Diagnostic réseau",
+                                        if (diagnostic.isBlank()) "Vérifier TLS sur le Xiaomi"
+                                        else diagnostic) {
+                                        TextButton(enabled = CloudixStatus.running.value, onClick = {
+                                            scope.launch {
+                                                diagnostic = "Test en cours…"
+                                                try {
+                                                    val latency = withContext(Dispatchers.IO) {
+                                                        CloudixClient(Peer("127.0.0.1", 8731,
+                                                            settings.secret(), TlsIdentity.fingerprint(context))).ping()
+                                                    }
+                                                    diagnostic = "TLS opérationnel · $latency ms"
+                                                } catch (e: Exception) {
+                                                    diagnostic = "Échec local : ${e.message}"
+                                                }
+                                            }
+                                        }) { Text("Tester") }
+                                    }
                                     SettingItem(Icons.Rounded.Wifi, "Adresse sur le réseau",
                                         "${CloudixSettings.localAddress() ?: "Wi-Fi indisponible"}:8731")
                                     SettingItem(Icons.Rounded.Folder, "Dossier partagé",
@@ -255,7 +301,9 @@ fun CloudixApp(incoming: String) {
                                                     try {
                                                         val link = connectionInput.trim()
                                                         withContext(Dispatchers.IO) {
-                                                            CloudixClient(Peer.parse(link)).list("")
+                                                            val remote = CloudixClient(Peer.parse(link))
+                                                            remote.ping()
+                                                            remote.list("")
                                                         }
                                                         settings.peer = link
                                                         peerLink = link
@@ -265,6 +313,20 @@ fun CloudixApp(incoming: String) {
                                             })
                                     } else {
                                         SectionTitle("Raccourcis")
+                                        SettingItem(Icons.Rounded.CheckCircle, "Tester la connexion",
+                                            diagnostic.ifBlank { "Mesurer l'accès au Xiaomi" }) {
+                                            TextButton(onClick = {
+                                                scope.launch {
+                                                    diagnostic = "Connexion…"
+                                                    try {
+                                                        val elapsed = withContext(Dispatchers.IO) {
+                                                            CloudixClient(Peer.parse(peerLink)).ping()
+                                                        }
+                                                        diagnostic = "Connecté · TLS $elapsed ms"
+                                                    } catch (e: Exception) { diagnostic = e.message ?: "Connexion impossible" }
+                                                }
+                                            }) { Text("Tester") }
+                                        }
                                         SettingItem(Icons.Rounded.FolderOpen, "Explorer les fichiers",
                                             "Dossiers du serveur") { TextButton(onClick = { page = 1 }) { Text("Ouvrir") } }
                                         SettingItem(Icons.Rounded.Backup, "Sauvegarde automatique",
@@ -302,19 +364,64 @@ fun CloudixApp(incoming: String) {
                                         Icon(Icons.Rounded.CreateNewFolder, "Nouveau dossier")
                                     }
                                 }
+                                OutlinedTextField(value = searchQuery,
+                                    onValueChange = { searchQuery = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                                    trailingIcon = {
+                                        if (searchQuery.isNotEmpty()) IconButton(onClick = { searchQuery = "" }) {
+                                            Icon(Icons.Rounded.Close, "Effacer")
+                                        }
+                                    }, label = { Text("Rechercher dans ce dossier") },
+                                    shape = MaterialTheme.shapes.large)
+                                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                    listOf("name" to "Nom", "date" to "Récents", "size" to "Taille").forEach { (id, label) ->
+                                        FilterChip(selected = settings.sort == id,
+                                            onClick = { settings.sort = id; revision++ },
+                                            label = { Text(label) })
+                                    }
+                                }
                                 if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-                                Spacer(Modifier.height(12.dp))
-                                LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    items(files.sortedWith(compareByDescending<RemoteFile> { it.directory }
-                                        .thenBy { it.name.lowercase() }), key = { it.path }) { file ->
+                                Spacer(Modifier.height(8.dp))
+                                val visibleFiles = files.filter {
+                                    it.name.contains(searchQuery, ignoreCase = true)
+                                }.sortedWith(Comparator { a, b ->
+                                    val directoryFirst = b.directory.compareTo(a.directory)
+                                    if (directoryFirst != 0) directoryFirst else when (settings.sort) {
+                                        "date" -> b.modified.compareTo(a.modified)
+                                        "size" -> b.size.compareTo(a.size)
+                                        else -> a.name.compareTo(b.name, ignoreCase = true)
+                                    }
+                                })
+                                if (!loading && visibleFiles.isEmpty()) {
+                                    Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Icon(Icons.Rounded.FolderOff, null,
+                                                modifier = Modifier.size(44.dp),
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Spacer(Modifier.height(10.dp))
+                                            Text(if (searchQuery.isNotBlank()) "Aucun résultat" else "Dossier vide",
+                                                style = MaterialTheme.typography.titleMedium)
+                                        }
+                                    }
+                                }
+                                LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    items(visibleFiles, key = { it.path }) { file ->
                                         ElevatedCard(onClick = {
                                             if (file.directory) currentPath = file.path
                                             else { pendingDownload = file; createDownload.launch(file.name) }
                                         }, modifier = Modifier.fillMaxWidth()) {
                                             Row(Modifier.fillMaxWidth().padding(12.dp),
                                                 verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(if (file.directory) Icons.Rounded.Folder else Icons.Rounded.InsertDriveFile,
-                                                    null, tint = MaterialTheme.colorScheme.primary,
+                                                Icon(when {
+                                                    file.directory -> Icons.Rounded.Folder
+                                                    file.mime.startsWith("image/") -> Icons.Rounded.Image
+                                                    file.mime.startsWith("video/") -> Icons.Rounded.Movie
+                                                    file.mime == "application/pdf" -> Icons.Rounded.PictureAsPdf
+                                                    file.mime.startsWith("audio/") -> Icons.Rounded.AudioFile
+                                                    else -> Icons.Rounded.InsertDriveFile
+                                                }, null, tint = MaterialTheme.colorScheme.primary,
                                                     modifier = Modifier.size(30.dp))
                                                 Spacer(Modifier.width(14.dp))
                                                 Column(Modifier.weight(1f)) {
@@ -329,8 +436,25 @@ fun CloudixApp(incoming: String) {
                                                     else { pendingDownload = file; createDownload.launch(file.name) }
                                                 }) { Icon(if (file.directory) Icons.Rounded.ChevronRight
                                                     else Icons.Rounded.Download, "Ouvrir") }
-                                                IconButton(onClick = { pendingDelete = file }) {
-                                                    Icon(Icons.Rounded.DeleteOutline, "Supprimer")
+                                                var expanded by remember(file.path) { mutableStateOf(false) }
+                                                Box {
+                                                    IconButton(onClick = { expanded = true }) {
+                                                        Icon(Icons.Rounded.MoreVert, "Options du fichier")
+                                                    }
+                                                    DropdownMenu(expanded = expanded, onDismissRequest = {
+                                                        expanded = false
+                                                    }) {
+                                                        DropdownMenuItem(
+                                                            text = { Text("Renommer") },
+                                                            leadingIcon = { Icon(Icons.Rounded.DriveFileRenameOutline, null) },
+                                                            onClick = {
+                                                                expanded = false; pendingRename = file; renameName = file.name
+                                                            })
+                                                        DropdownMenuItem(
+                                                            text = { Text("Supprimer") },
+                                                            leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) },
+                                                            onClick = { expanded = false; pendingDelete = file })
+                                                    }
                                                 }
                                             }
                                         }
@@ -386,10 +510,21 @@ fun CloudixApp(incoming: String) {
                                         Spacer(Modifier.width(8.dp)); Text("Ajouter un dossier à sauvegarder")
                                     }
                                     OutlinedButton(onClick = {
-                                        BackupScheduler.schedule(context)
-                                        message = "Planification actualisée"
+                                        if (peerLink.isBlank() || settings.backupFolders.isEmpty()) {
+                                            message = "Connecte un serveur et sélectionne au moins un dossier."
+                                        } else {
+                                            BackupScheduler.runNow(context)
+                                            message = "Sauvegarde demandée. Le système l'exécutera lorsque le Wi-Fi sera disponible."
+                                        }
                                     }, modifier = Modifier.fillMaxWidth()) {
-                                        Text("Actualiser la planification")
+                                        Icon(Icons.Rounded.Sync, null)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Sauvegarder maintenant")
+                                    }
+                                    if (settings.lastBackupAt > 0L) {
+                                        SettingItem(Icons.Rounded.History, "Dernier passage",
+                                            java.text.DateFormat.getDateTimeInstance().format(
+                                                java.util.Date(settings.lastBackupAt)))
                                     }
                                     Text("Si le Xiaomi n'est pas accessible, WorkManager réessaiera plus tard. Les fichiers supprimés ne sont pas effacés du serveur.",
                                         style = MaterialTheme.typography.bodySmall,
@@ -421,7 +556,7 @@ fun CloudixApp(incoming: String) {
                                     settings.role = ""; role = ""; page = 0
                                 }) { Text("Changer le rôle de ce téléphone") }
                                 Spacer(Modifier.height(16.dp))
-                                Text("Cloudix 0.1.0 · Version initiale · Accès Wi-Fi local uniquement",
+                                Text("Cloudix 0.2.0 · Wi-Fi local · Signature mise à jour selon l'APK",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
@@ -434,6 +569,30 @@ fun CloudixApp(incoming: String) {
             AlertDialog(onDismissRequest = { message = "" }, confirmButton = {
                 TextButton(onClick = { message = "" }) { Text("OK") }
             }, title = { Text("Cloudix") }, text = { Text(message) })
+        }
+        pendingRename?.let { file ->
+            AlertDialog(
+                onDismissRequest = { pendingRename = null },
+                title = { Text("Renommer") },
+                text = { OutlinedTextField(renameName, { renameName = it },
+                    label = { Text("Nouveau nom") }, singleLine = true) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        pendingRename = null
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) {
+                                    CloudixClient(Peer.parse(peerLink)).rename(file.path, renameName)
+                                }
+                                refresh()
+                            } catch (e: Exception) { report(e) }
+                        }
+                    }, enabled = renameName.isNotBlank()) { Text("Enregistrer") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingRename = null }) { Text("Annuler") }
+                }
+            )
         }
         pendingDelete?.let { file ->
             AlertDialog(
