@@ -26,9 +26,13 @@ object BackupScheduler {
             cancel(context)
             return
         }
-        val constraints = Constraints.Builder().setRequiredNetworkType(
-            if (settings.wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED
-        ).build()
+        // Android sometimes marks a working Tailscale VPN as unvalidated.
+        // When mobile data is authorized, do not let WorkManager's network
+        // capability check block a route which Cloudix itself can reach.
+        // The worker performs an authenticated HTTPS ping before uploading.
+        val constraints = if (settings.wifiOnly)
+            Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build()
+        else Constraints.Builder().build()
         val request = PeriodicWorkRequestBuilder<BackupWorker>(
             settings.interval.coerceAtLeast(15), TimeUnit.MINUTES
         ).setConstraints(constraints).build()
@@ -37,15 +41,22 @@ object BackupScheduler {
     }
     fun runNow(context: Context): UUID {
         val settings = CloudixSettings(context)
-        val constraints = Constraints.Builder().setRequiredNetworkType(
-            if (settings.wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED
-        ).build()
+        // Android sometimes marks a working Tailscale VPN as unvalidated.
+        // When mobile data is authorized, do not let WorkManager's network
+        // capability check block a route which Cloudix itself can reach.
+        // The worker performs an authenticated HTTPS ping before uploading.
+        val constraints = if (settings.wifiOnly)
+            Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build()
+        else Constraints.Builder().build()
         // Expedited work starts as soon as Android permits it; it does not wait
         // for the next periodic backup interval. Quota fallback remains safe.
-        val request = OneTimeWorkRequestBuilder<BackupWorker>()
-            .setConstraints(constraints)
-            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-            .build()
+        val builder = OneTimeWorkRequestBuilder<BackupWorker>().setConstraints(constraints)
+        // On Android 12+, expedited jobs can start sooner. Pre-12 falls back
+        // to ordinary WorkManager jobs (no custom ForegroundInfo required).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+        }
+        val request = builder.build()
         settings.lastManualBackupId = request.id.toString()
         WorkManager.getInstance(context).enqueueUniqueWork(
             "cloudix_manual_backup", ExistingWorkPolicy.REPLACE, request
