@@ -242,6 +242,16 @@ class CloudixClient(val peer: Peer, private val context: Context? = null) {
 
     private fun hostname(): String = peer.endpoints(preferIpv6()).first()
 
+    private fun describeFailure(e: Exception): Exception {
+        if (preferIpv6() && peer.globalIpv6 != null &&
+            (e is java.net.ConnectException || e is java.net.SocketTimeoutException ||
+             e is java.net.NoRouteToHostException)) {
+            return CloudixConnectionException(
+                "Connexion IPv6 directe impossible. Le Xiaomi a une adresse IPv6 publique, mais le réseau peut bloquer les connexions entrantes. Sans accès au routeur ni relais, Cloudix ne peut pas contourner ce filtrage.", e)
+        }
+        return CloudixNetworkFailure.describe(e)
+    }
+
     private fun connection(route: String, method: String = "GET"): HttpsURLConnection {
         val cm = context?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
         val caps = cm?.getNetworkCapabilities(cm.activeNetwork)
@@ -268,7 +278,7 @@ class CloudixClient(val peer: Peer, private val context: Context? = null) {
         try {
             if (conn.responseCode !in 200..299) throw CloudixNetworkFailure.http(conn.responseCode, conn.errorStream)
             return conn.inputStream.bufferedReader().use { it.readText() }
-        } catch (e: Exception) { throw CloudixNetworkFailure.describe(e) }
+        } catch (e: Exception) { throw describeFailure(e) }
         finally { conn.disconnect() }
     }
     fun ping(): Long {
@@ -302,7 +312,7 @@ class CloudixClient(val peer: Peer, private val context: Context? = null) {
             conn.setFixedLengthStreamingMode(length)
             conn.outputStream.use { out -> source.use { copyExactly(it, out, length) } }
             if (conn.responseCode !in 200..299) throw CloudixNetworkFailure.http(conn.responseCode, conn.errorStream)
-        } catch (e: Exception) { throw CloudixNetworkFailure.describe(e) }
+        } catch (e: Exception) { throw describeFailure(e) }
         finally { conn.disconnect() }
     }
     fun download(path: String, sink: OutputStream) {
@@ -310,7 +320,7 @@ class CloudixClient(val peer: Peer, private val context: Context? = null) {
         try {
             if (conn.responseCode != 200) throw CloudixNetworkFailure.http(conn.responseCode, conn.errorStream)
             conn.inputStream.use { input -> sink.use { output -> input.copyTo(output, 65536) } }
-        } catch (e: Exception) { throw CloudixNetworkFailure.describe(e) }
+        } catch (e: Exception) { throw describeFailure(e) }
         finally { conn.disconnect() }
     }
 }
