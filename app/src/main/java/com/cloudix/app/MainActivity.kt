@@ -90,7 +90,7 @@ fun CloudixApp(incoming: String) {
         if (role != "client" || peerLink.isBlank()) return
         loading = true
         try {
-            files = withContext(Dispatchers.IO) { CloudixClient(Peer.parse(peerLink)).list(currentPath) }
+            files = withContext(Dispatchers.IO) { CloudixClient(Peer.parse(peerLink), context).list(currentPath) }
             message = ""
         } catch (e: Exception) { report(e) }
         finally { loading = false }
@@ -121,7 +121,7 @@ fun CloudixApp(incoming: String) {
             val folder = currentPath
             try {
                 withContext(Dispatchers.IO) {
-                    val client = CloudixClient(Peer.parse(peerLink))
+                    val client = CloudixClient(Peer.parse(peerLink), context)
                     for (uri in uris) {
                         val resolver = context.contentResolver
                         val (name, size) = resolver.query(uri,
@@ -154,7 +154,7 @@ fun CloudixApp(incoming: String) {
                 withContext(Dispatchers.IO) {
                     val output = context.contentResolver.openOutputStream(uri)
                         ?: throw IllegalStateException("Impossible de créer le fichier")
-                    CloudixClient(Peer.parse(peerLink)).download(file.path, output)
+                    CloudixClient(Peer.parse(peerLink), context).download(file.path, output)
                 }
                 message = "Fichier téléchargé : ${file.name}"
             } catch (e: Exception) { report(e) }
@@ -274,7 +274,21 @@ fun CloudixApp(incoming: String) {
                                             })
                                         }
                                     }
-                                    Text("Le serveur doit rester actif. L'accès Internet/5G hors Wi-Fi n'est pas encore intégré.",
+                                    SectionTitle("Connexion directe 5G")
+                                    val globalV6 = remember(revision, CloudixStatus.running.value) {
+                                        CloudixSettings.globalIpv6Address()
+                                    }
+                                    SettingItem(Icons.Rounded.Public, "Adresse IPv6 publique",
+                                        globalV6 ?: "Indisponible sur le Wi-Fi du Xiaomi") {
+                                        if (globalV6 != null) {
+                                            Icon(Icons.Rounded.CheckCircle, contentDescription = "IPv6 détectée",
+                                                tint = MaterialTheme.colorScheme.primary)
+                                        }
+                                    }
+                                    Text(if (globalV6 == null)
+                                        "Aucune IPv6 publique détectée. Sans accès à la box ni relais, la connexion 5G directe est impossible sur ce réseau."
+                                    else
+                                        "IPv6 détectée : teste le QR depuis le Vivo en 5G. Le pare-feu de la box peut encore bloquer les connexions entrantes.",
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         style = MaterialTheme.typography.bodySmall)
                                 } else {
@@ -301,7 +315,7 @@ fun CloudixApp(incoming: String) {
                                                     try {
                                                         val link = connectionInput.trim()
                                                         withContext(Dispatchers.IO) {
-                                                            val remote = CloudixClient(Peer.parse(link))
+                                                            val remote = CloudixClient(Peer.parse(link), context)
                                                             remote.ping()
                                                             remote.list("")
                                                         }
@@ -312,6 +326,16 @@ fun CloudixApp(incoming: String) {
                                                 }
                                             })
                                     } else {
+                                        val paired = remember(peerLink) {
+                                            try { Peer.parse(peerLink) } catch (_: Exception) { null }
+                                        }
+                                        if (paired != null) {
+                                            SettingItem(Icons.Rounded.Public, "Accès 5G direct",
+                                                if (paired.globalIpv6 == null)
+                                                    "Pas d'IPv6 publique enregistrée : réappaire en Wi-Fi."
+                                                else
+                                                    "IPv6 enregistrée : active la 5G et lance Tester.")
+                                        }
                                         SectionTitle("Raccourcis")
                                         SettingItem(Icons.Rounded.CheckCircle, "Tester la connexion",
                                             diagnostic.ifBlank { "Mesurer l'accès au Xiaomi" }) {
@@ -320,7 +344,7 @@ fun CloudixApp(incoming: String) {
                                                     diagnostic = "Connexion…"
                                                     try {
                                                         val elapsed = withContext(Dispatchers.IO) {
-                                                            CloudixClient(Peer.parse(peerLink)).ping()
+                                                            CloudixClient(Peer.parse(peerLink), context).ping()
                                                         }
                                                         diagnostic = "Connecté · TLS $elapsed ms"
                                                     } catch (e: Exception) { diagnostic = e.message ?: "Connexion impossible" }
@@ -593,7 +617,7 @@ fun CloudixApp(incoming: String) {
                         scope.launch {
                             try {
                                 withContext(Dispatchers.IO) {
-                                    CloudixClient(Peer.parse(peerLink)).rename(file.path, renameName)
+                                    CloudixClient(Peer.parse(peerLink), context).rename(file.path, renameName)
                                 }
                                 refresh()
                             } catch (e: Exception) { report(e) }
@@ -616,7 +640,7 @@ fun CloudixApp(incoming: String) {
                         scope.launch {
                             try {
                                 withContext(Dispatchers.IO) {
-                                    CloudixClient(Peer.parse(peerLink)).delete(file.path)
+                                    CloudixClient(Peer.parse(peerLink), context).delete(file.path)
                                 }
                                 refresh()
                             } catch (e: Exception) { report(e) }
@@ -636,7 +660,7 @@ fun CloudixApp(incoming: String) {
                         scope.launch {
                             try {
                                 withContext(Dispatchers.IO) {
-                                    CloudixClient(Peer.parse(peerLink)).mkdir(currentPath, newFolder)
+                                    CloudixClient(Peer.parse(peerLink), context).mkdir(currentPath, newFolder)
                                 }
                                 newFolder = ""; refresh()
                             } catch (e: Exception) { report(e) }

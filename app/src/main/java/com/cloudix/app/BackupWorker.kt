@@ -44,7 +44,7 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         val settings = CloudixSettings(applicationContext)
         if (settings.peer.isBlank() || settings.backupFolders.isEmpty()) return Result.success()
         return try {
-            val client = CloudixClient(Peer.parse(settings.peer))
+            val client = CloudixClient(Peer.parse(settings.peer), applicationContext)
             val state = settings.backupState()
             val device = safeName(Build.MODEL.ifBlank { "Android" })
             ensure(client, "", "Backups")
