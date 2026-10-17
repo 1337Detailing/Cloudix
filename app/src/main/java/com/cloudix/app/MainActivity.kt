@@ -280,9 +280,9 @@ fun CloudixApp(incoming: String) {
                                     }
                                     SettingItem(Icons.Rounded.Public, "Adresse IPv6 publique",
                                         globalV6 ?: "Indisponible sur le Wi-Fi du Xiaomi") {
-                                        if (globalV6 != null) {
-                                            Icon(Icons.Rounded.CheckCircle, contentDescription = "IPv6 détectée",
-                                                tint = MaterialTheme.colorScheme.primary)
+                                        IconButton(onClick = { revision++ }) {
+                                            Icon(Icons.Rounded.Refresh,
+                                                contentDescription = "Actualiser l'adresse IPv6")
                                         }
                                     }
                                     Text(if (globalV6 == null)
