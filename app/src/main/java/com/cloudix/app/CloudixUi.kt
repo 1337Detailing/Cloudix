@@ -36,17 +36,22 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 private val swatches = listOf(
-    Color(0xFF6750A4), Color(0xFF327E7C), Color(0xFFB65380), Color(0xFFAD6A36),
-    Color(0xFF346CB5), Color(0xFF8263A9), Color(0xFF5A803F), Color(0xFFB2524F)
-)
+    0xFF6750A4, 0xFF327E7C, 0xFFB65380, 0xFFAD6A36, 0xFF346CB5, 0xFF8263A9,
+    0xFF5A803F, 0xFFB2524F, 0xFF6750CA, 0xFF0A8B9D, 0xFFB44177, 0xFF935C21,
+    0xFF1F7C82, 0xFF7448A0, 0xFF3D9062, 0xFFAD4845, 0xFF5468B7, 0xFF168E8B,
+    0xFFAD5989, 0xFF8C7240, 0xFF4B7F99, 0xFF8859B5, 0xFF759144, 0xFFA45B47,
+    0xFF8353C8, 0xFF427DCA, 0xFFB15697, 0xFFBA6440, 0xFF3D907F, 0xFF84709F
+).map(::Color)
 private val white = Color(0xFFFDFCFF)
 private val darkSurface = Color(0xFF11121A)
-private fun seededScheme(seed: Color, dark: Boolean): ColorScheme {
+private fun seededScheme(seed: Color, dark: Boolean, intensity: Int): ColorScheme {
     val primary = if (dark) lerp(seed, Color.White, .32f) else seed
     val container = if (dark) lerp(seed, darkSurface, .67f) else lerp(seed, white, .86f)
     val secondary = if (dark) lerp(seed, Color.White, .48f) else lerp(seed, Color.Black, .17f)
     val surface = if (dark) darkSurface else Color(0xFFFCFBFF)
-    val elevated = if (dark) lerp(seed, darkSurface, .89f) else lerp(seed, white, .96f)
+    val blend = (intensity.coerceIn(0, 4) / 4f)
+    val elevated = if (dark) lerp(Color(0xFF20212B), lerp(seed, darkSurface, .78f), blend)
+        else lerp(Color(0xFFF2F1F7), lerp(seed, white, .85f), blend)
     return if (dark) darkColorScheme(
         primary = primary, onPrimary = Color(0xFF15131D),
         primaryContainer = container, onPrimaryContainer = Color(0xFFF6F1FF),
@@ -89,7 +94,7 @@ fun CloudixTheme(settings: CloudixSettings, revision: Int, content: @Composable 
     // Android 12+ dynamic colors originate from the OS wallpaper palette.
     // OEMs that omit Monet resources can always use a complete Cloudix palette instead.
     val systemPalette = settings.dynamic && Build.VERSION.SDK_INT >= 31
-    val fallback = seededScheme(swatches[settings.accent.coerceIn(0, swatches.lastIndex)], dark)
+    val fallback = seededScheme(swatches[settings.accent.coerceIn(0, swatches.lastIndex)], dark, settings.surfaceIntensity)
     val colors = if (systemPalette) {
         runCatching {
             if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
@@ -345,7 +350,12 @@ fun AppearancePage(settings: CloudixSettings, onChange: () -> Unit) {
                 }
                 Spacer(Modifier.height(14.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = {}, enabled = false) { Text("Bouton") }
+                    Surface(shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.primary) {
+                        Text("Bouton", Modifier.padding(horizontal = 18.dp, vertical = 11.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontWeight = FontWeight.SemiBold)
+                    }
                     Surface(shape = RoundedCornerShape(13.dp),
                         color = MaterialTheme.colorScheme.surface) {
                         Text("Cartes", Modifier.padding(12.dp),
@@ -375,27 +385,42 @@ fun AppearancePage(settings: CloudixSettings, onChange: () -> Unit) {
                 enabled = Build.VERSION.SDK_INT >= 31,
                 onCheckedChange = { settings.dynamic = it; onChange() })
         }
-        SectionTitle("Palettes Cloudix", "8 STYLES")
+        SectionTitle("Palettes Cloudix", "30 STYLES")
         Text("Les palettes personnalisées remplacent les couleurs dynamiques et recolorent toutes les surfaces.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(14.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            swatches.forEachIndexed { index, color ->
-                Surface(onClick = {
-                    settings.dynamic = false; settings.accent = index; onChange()
-                }, shape = RoundedCornerShape(15.dp),
-                    color = color, modifier = Modifier.weight(1f).height(50.dp),
-                    border = if (settings.accent == index && !settings.dynamic)
-                        BorderStroke(3.dp, MaterialTheme.colorScheme.onBackground)
-                    else null) {
-                    Box(contentAlignment = Alignment.Center) {
-                        if (!settings.dynamic && settings.accent == index)
-                            Icon(Icons.Rounded.Check, null, tint = Color.White)
+        swatches.chunked(6).forEachIndexed { rowIndex, group ->
+            Row(Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                group.forEachIndexed { colIndex, color ->
+                    val index = rowIndex * 6 + colIndex
+                    Surface(onClick = {
+                        settings.dynamic = false
+                        settings.accent = index
+                        onChange()
+                    }, shape = RoundedCornerShape(16.dp),
+                        color = color, modifier = Modifier.weight(1f).height(48.dp),
+                        border = if (settings.accent == index && !settings.dynamic)
+                            BorderStroke(2.dp, MaterialTheme.colorScheme.onBackground)
+                        else null) {
+                        Box(contentAlignment = Alignment.Center) {
+                            if (!settings.dynamic && settings.accent == index)
+                                Icon(Icons.Rounded.Check, null, tint = Color.White)
+                        }
                     }
                 }
             }
+            Spacer(Modifier.height(9.dp))
         }
+        SectionTitle("Intensité des surfaces", "${settings.surfaceIntensity + 1} / 5")
+        Slider(value = settings.surfaceIntensity.toFloat(),
+            onValueChange = { settings.surfaceIntensity = it.toInt(); onChange() },
+            valueRange = 0f..4f, steps = 3,
+            enabled = !settings.dynamic)
+        Text("Adapte l'intensité des cartes et des fonds teintés. Désactive Material You pour utiliser ce réglage.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(24.dp))
         SectionTitle("Mouvement")
         SettingItem(Icons.Rounded.Animation, "Animations fluides",

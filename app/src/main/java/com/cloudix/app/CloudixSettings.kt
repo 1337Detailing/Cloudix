@@ -30,6 +30,9 @@ class CloudixSettings(private val context: Context) {
     var dynamic: Boolean
         get() = prefs.getBoolean("dynamic", true)
         set(v) = prefs.edit().putBoolean("dynamic", v).apply()
+    var surfaceIntensity: Int
+        get() = prefs.getInt("surface_intensity", 2)
+        set(value) = prefs.edit().putInt("surface_intensity", value.coerceIn(0, 4)).apply()
     var animations: Boolean
         get() = prefs.getBoolean("animations", true)
         set(value) = prefs.edit().putBoolean("animations", value).apply()
