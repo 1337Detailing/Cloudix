@@ -31,8 +31,13 @@ object CloudixConnectivity {
         val client = CloudixClient(peer, context, connectTimeoutMs = 4_500, readTimeoutMs = 7_500)
         val address = client.selectedAddress()
         val ipv6 = address.contains(':')
-        val label = if (ipv6) "IPv6 directe" else "Wi-Fi local (IPv4)"
-        if (mobile && !ipv6 && peer.host.matches(Regex("(\\d{1,3}\\.){3}\\d{1,3}"))) {
+        val tailscale = CloudixTailnet.isTailnetIpv4(address)
+        val label = when {
+            tailscale -> "VPN Tailscale"
+            ipv6 -> "IPv6 directe"
+            else -> "Wi-Fi local (IPv4)"
+        }
+        if (mobile && !ipv6 && !tailscale && peer.host.matches(Regex("(\\d{1,3}\\.){3}\\d{1,3}"))) {
             return ConnectionDiagnostic(false, "Pas de route 5G",
                 "Le QR ne contient pas d'IPv6 publique. Le réseau privé du Xiaomi est inaccessible en 5G sans relais ou ouverture du routeur.",
                 path = label)
@@ -59,6 +64,8 @@ object CloudixConnectivity {
                 else -> "Le Xiaomi n'a pas répondu"
             }
             val explanation = when {
+                unreachable && tailscale ->
+                    "Le Xiaomi n'est pas accessible via Tailscale. Vérifie que Tailscale est connecté sur les deux téléphones et que tu utilises bien l'adresse 100.x du Xiaomi."
                 unreachable && ipv6 ->
                     "Le Xiaomi a une IPv6 publique, mais le port ${peer.port} ne répond pas depuis ce réseau. Le pare-feu de la box ou un filtrage de l'opérateur peut bloquer la connexion entrante. Sans accès au routeur ni relais, Cloudix ne peut pas contourner ce blocage."
                 unreachable ->
