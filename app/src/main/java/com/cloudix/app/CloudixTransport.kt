@@ -27,17 +27,17 @@ import javax.net.ssl.X509TrustManager
 import javax.security.auth.x500.X500Principal
 
 object TlsIdentity {
-    private const val ALIAS = "cloudix-server-v1"
+    private const val ALIAS = "cloudix-server-ec-v2"
     fun keyStore(): KeyStore {
         val ks = KeyStore.getInstance("AndroidKeyStore")
         ks.load(null)
         if (!ks.containsAlias(ALIAS)) {
-            val generator = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_RSA, "AndroidKeyStore")
+            val generator = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC, "AndroidKeyStore")
             generator.initialize(
                 KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY)
-                    .setKeySize(2048)
-                    .setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512)
-                    .setSignaturePaddings(KeyProperties.SIGNATURE_PADDING_RSA_PKCS1)
+                    .setAlgorithmParameterSpec(java.security.spec.ECGenParameterSpec("secp256r1"))
+                    .setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA384,
+                        KeyProperties.DIGEST_SHA512)
                     .setCertificateSubject(X500Principal("CN=Cloudix"))
                     .setCertificateSerialNumber(java.math.BigInteger.ONE)
                     .setCertificateNotBefore(java.util.Date(System.currentTimeMillis() - 86_400_000))
@@ -53,6 +53,7 @@ object TlsIdentity {
         return CloudixSettings.fingerprint(cert.encoded)
     }
     fun serverContext(): SSLContext {
+        // P-256 ECDSA avoids Android Conscrypt RSA-PSS raw-key incompatibilities.
         // Some AndroidKeyStore implementations don't enumerate aliases via the
         // platform's default KeyManagerFactory. Supply the Keystore identity explicitly.
         val ks = keyStore()
@@ -63,9 +64,9 @@ object TlsIdentity {
             override fun getClientAliases(keyType: String?, issuers: Array<java.security.Principal>?): Array<String> = emptyArray()
             override fun chooseClientAlias(keyType: Array<String>?, issuers: Array<java.security.Principal>?, socket: Socket?): String? = null
             override fun getServerAliases(keyType: String?, issuers: Array<java.security.Principal>?): Array<String> =
-                if (keyType.equals("RSA", true)) arrayOf(ALIAS) else emptyArray()
+                if (keyType.equals("EC", true) || keyType.equals("ECDSA", true)) arrayOf(ALIAS) else emptyArray()
             override fun chooseServerAlias(keyType: String?, issuers: Array<java.security.Principal>?, socket: Socket?): String? =
-                if (keyType.equals("RSA", true)) ALIAS else null
+                if (keyType.equals("EC", true) || keyType.equals("ECDSA", true)) ALIAS else null
             override fun chooseEngineServerAlias(keyType: String?, issuers: Array<java.security.Principal>?, engine: SSLEngine?): String? =
                 if (keyType.equals("RSA", true)) ALIAS else null
             override fun getCertificateChain(alias: String?): Array<X509Certificate>? =
