@@ -65,3 +65,17 @@ When all secrets exist, GitHub Actions signs both debug and release APKs **with 
 The original 0.1 Android TLS handshake failed with `SSLHandshakeException: connection closed`. We reproduced this on a real Android emulator CI test. Opaque Android Keystore private keys caused Conscrypt's RSA operations to fail, and directly stored EC keys also failed. The current implementation uses an exportable per-device software EC P-256 private key, persisted exclusively as Android Keystore AES-GCM ciphertext. **Pinned TLS handshake succeeded** in emulator workflow [39048975148](https://github.com/1337Detailing/Cloudix/actions/runs/39048975148). This does not substitute for physical Xiaomi/Vivo testing. Re-pair after installing 0.2.0 because the server certificate has changed.
 
 UI inspiration: [Clint Gecko](https://github.com/jhaiian/ClintGecko), Material 3 / Compose customization patterns. No Clint code, artwork or brand assets are copied. The original Cloudix theme contains 30 accents × 5 surface intensities, OS wallpaper color fallback, and optional animations.
+
+## Direct mobile (5G) connection without a box login, VPN provider or rented server
+
+Cloudix v0.3 attempts a direct TLS connection over IPv6 when the Xiaomi's Android Wi-Fi interface has a global IPv6 address. Its pairing link includes both the local IPv4 and public IPv6 address. The Vivo selects the IPv6 address when using cellular data, while keeping direct IPv4 within the same Wi-Fi. The QR retains the certificate pin and random bearer secret.
+
+**Hard limitation:** Public IPv6 does not imply an open, reachable IPv6 port. Home router firewalls and carrier inbound packet filtering commonly block unsolicited traffic. Without opening a router port, a reachable public address, or any third-party coordination/relay, **there is no technically reliable way to guarantee Internet access from two phones**. Cloudix reports whether a global IPv6 address exists, and the Vivo's real 5G test determines reachability. If blocked, the app does not circumvent the firewall. No root privileges are required.
+
+Do not open port 8731 to the wider Internet casually. Network-facing encrypted authentication does not eliminate denial-of-service risks. For reliable no-box 5G use, one must relax at least one constraint (e.g., permit a free VPN signaling/relay service).
+
+## In-app signed GitHub debug updates
+
+On the Settings screen, tap **Rechercher les builds GitHub**. Cloudix reads a SHA-256 manifest from the `debug-latest` GitHub Release, downloads the signed APK and verifies both the digest and the installed Android signing certificate before offering the system installer.
+
+The CI workflow publishes debug releases **only if the same stable signing secrets are configured** and on push to main. Configure `CLOUDIX_KEYSTORE_B64`, `CLOUDIX_STORE_PASSWORD`, `CLOUDIX_KEY_PASSWORD`, and `CLOUDIX_KEY_ALIAS` as detailed in [SIGNING.md](SIGNING.md). Without these secrets the updater will not find a public build. Old ephemeral GitHub-debug signatures cannot update in place and require one final reinstall to the stable signing identity.

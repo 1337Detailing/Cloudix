@@ -582,6 +582,7 @@ fun CloudixApp(incoming: String) {
                                         settings.peer = ""; peerLink = ""; currentPath = ""; files = emptyList()
                                     }) { Text("Déconnecter ce serveur") }
                                 }
+                                UpdatesPanel()
                                 SectionTitle("Appareil")
                                 SettingItem(Icons.Rounded.PhoneAndroid, "Mode actif",
                                     if (role == "server") "Serveur" else "Client")
@@ -591,7 +592,7 @@ fun CloudixApp(incoming: String) {
                                     settings.role = ""; role = ""; page = 0
                                 }) { Text("Changer le rôle de ce téléphone") }
                                 Spacer(Modifier.height(16.dp))
-                                Text("Cloudix 0.2.0 · Wi-Fi local · Signature mise à jour selon l'APK",
+                                Text("Cloudix 0.3.0 · IPv6 directe · Signature mise à jour selon l'APK",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }

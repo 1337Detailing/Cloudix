@@ -8,7 +8,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 permissions:
-  contents: read
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -61,6 +61,21 @@ jobs:
           name: Cloudix-release-signed
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
+      - name: Publish signed debug update channel
+        if: env.CLOUDIX_SIGNED == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/cloudix-debug.apk"
+          DIGEST="$(sha256sum "$RUNNER_TEMP/cloudix-debug.apk" | cut -d' ' -f1)"
+          VERSION_CODE="$((1000 + GITHUB_RUN_NUMBER))"
+          printf '{"versionCode":%d,"sha256":"%s","url":"https://github.com/1337Detailing/Cloudix/releases/download/debug-latest/cloudix-debug.apk","title":"Build debug #%s"}\\n' "$VERSION_CODE" "$DIGEST" "$GITHUB_RUN_NUMBER" > "$RUNNER_TEMP/update.json"
+          if gh release view debug-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload debug-latest "$RUNNER_TEMP/cloudix-debug.apk" "$RUNNER_TEMP/update.json" --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create debug-latest "$RUNNER_TEMP/cloudix-debug.apk" "$RUNNER_TEMP/update.json" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Cloudix debug (mise à jour intégrée)" --notes "Canal de test signé en continu. APK vérifiée par l'application avant installation." --prerelease
+          fi
       - name: Upload Cloudix APK
         uses: actions/upload-artifact@v4
         with:
