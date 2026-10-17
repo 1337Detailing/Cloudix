@@ -45,6 +45,14 @@ class CloudixSettings(private val context: Context) {
     var serverAutoStart: Boolean
         get() = prefs.getBoolean("server_auto_start", false)
         set(value) = prefs.edit().putBoolean("server_auto_start", value).apply()
+    var tailscaleAddress: String
+        get() = prefs.getString("tailscale_address", "") ?: ""
+        set(value) {
+            require(value.isBlank() || CloudixTailnet.isTailnetIpv4(value)) {
+                "Adresse Tailscale invalide (100.64.0.0/10)"
+            }
+            prefs.edit().putString("tailscale_address", value).apply()
+        }
     var preferDirectIpv6: Boolean
         get() = prefs.getBoolean("prefer_direct_ipv6", false)
         set(value) = prefs.edit().putBoolean("prefer_direct_ipv6", value).apply()
@@ -124,9 +132,12 @@ class CloudixSettings(private val context: Context) {
         secret()
     }
     fun serverLink(): String {
-        val address = localAddress() ?: globalIpv6Address() ?: return ""
+        val vpn = tailscaleAddress.ifBlank { CloudixTailnet.detectOnDevice().orEmpty() }
+            .takeIf(CloudixTailnet::isTailnetIpv4)
+        val address = localAddress() ?: vpn ?: globalIpv6Address() ?: return ""
         val alternative = globalIpv6Address()?.let { "&ipv6=${Uri.encode(it)}" } ?: ""
-        return "cloudix://pair?host=${Uri.encode(address)}&port=8731&secret=${Uri.encode(secret())}&fingerprint=${TlsIdentity.fingerprint(context)}${alternative}"
+        val tailscale = vpn?.let { "&tailscale=${Uri.encode(it)}" } ?: ""
+        return "cloudix://pair?host=${Uri.encode(address)}&port=8731&secret=${Uri.encode(secret())}&fingerprint=${TlsIdentity.fingerprint(context)}${alternative}${tailscale}"
     }
     companion object {
         fun localAddress(): String? {
