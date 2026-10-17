@@ -67,15 +67,23 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/cloudix-debug.apk"
+          # Publish the verified stable-key release APK, never the ephemeral debug APK.
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/cloudix-debug.apk"
           DIGEST="$(sha256sum "$RUNNER_TEMP/cloudix-debug.apk" | cut -d' ' -f1)"
           VERSION_CODE="$((1000 + GITHUB_RUN_NUMBER))"
+          # The release and metadata must describe exactly the same signed artifact.
+          test -s "$RUNNER_TEMP/cloudix-debug.apk"
+          test -n "$DIGEST"
           printf '{"versionCode":%d,"sha256":"%s","url":"https://github.com/1337Detailing/Cloudix/releases/download/debug-latest/cloudix-debug.apk","title":"Build debug #%s"}' "$VERSION_CODE" "$DIGEST" "$GITHUB_RUN_NUMBER" > "$RUNNER_TEMP/update.json"
           if gh release view debug-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload debug-latest "$RUNNER_TEMP/cloudix-debug.apk" "$RUNNER_TEMP/update.json" --clobber --repo "$GITHUB_REPOSITORY"
           else
             gh release create debug-latest "$RUNNER_TEMP/cloudix-debug.apk" "$RUNNER_TEMP/update.json" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Cloudix debug (mise à jour intégrée)" --notes "Canal de test signé en continu. APK vérifiée par l'application avant installation." --prerelease
           fi
+      - name: Signing status notice
+        if: env.CLOUDIX_SIGNED != 'true'
+        run: |
+          echo "::warning::Cloudix cannot publish in-app updates without the four stable signing secrets. GitHub Actions APKs are temporary builds; see README signing instructions."
       - name: Upload Cloudix APK
         uses: actions/upload-artifact@v4
         with:
