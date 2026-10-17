@@ -18,6 +18,17 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Restore the same signing identity used by Cloudix APK builds
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: cloudix-debug-signing-v1
+      - name: Validate persisted Android signing key is available
+        run: |
+          test -s "$HOME/.android/debug.keystore" || {
+            echo "::error::Stable signing cache missing: main APK workflow must initialize it first."
+            exit 1
+          }
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
