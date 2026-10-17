@@ -87,6 +87,9 @@ fun CloudixApp(incoming: String) {
     var connectionVerified by remember { mutableStateOf(false) }
     var connectionChecking by remember { mutableStateOf(false) }
     var connectionChecked by remember { mutableStateOf(false) }
+    var tailscaleInput by remember { mutableStateOf(settings.tailscaleAddress) }
+    var clientTailscaleInput by remember { mutableStateOf("") }
+    var showTailscaleDialog by remember { mutableStateOf(false) }
 
     fun report(error: Throwable) { message = error.message ?: "Une erreur s'est produite." }
     suspend fun refresh() {
@@ -287,6 +290,40 @@ fun CloudixApp(incoming: String) {
                                             })
                                         }
                                     }
+                                    SectionTitle("Tailscale · Connexion 5G")
+                                    val detectedTailscale = remember(revision, CloudixStatus.running.value) {
+                                        CloudixTailnet.detectOnDevice()
+                                    }
+                                    SettingItem(Icons.Rounded.VpnKey, "VPN privé du Xiaomi",
+                                        detectedTailscale?.let { "Adresse détectée : $it" }
+                                            ?: "Installe Tailscale puis relève l'adresse 100.x du Xiaomi")
+                                    OutlinedTextField(
+                                        value = tailscaleInput,
+                                        onValueChange = { tailscaleInput = it.trim() },
+                                        label = { Text("Adresse Tailscale du Xiaomi") },
+                                        placeholder = { Text("100.100.100.100") },
+                                        supportingText = {
+                                            Text("IP de Tailscale, pas l'IP Wi-Fi. Laisse vide si détectée automatiquement.")
+                                        },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(onClick = {
+                                            try {
+                                                settings.tailscaleAddress = tailscaleInput
+                                                revision++
+                                                message = "Adresse VPN enregistrée. Affiche un nouveau QR d'appairage sur le Xiaomi."
+                                            } catch (e: Exception) { report(e) }
+                                        }) { Text("Enregistrer") }
+                                        OutlinedButton(onClick = {
+                                            context.startActivity(Intent(Intent.ACTION_VIEW,
+                                                Uri.parse("https://play.google.com/store/apps/details?id=com.tailscale.ipn")))
+                                        }) { Text("Installer Tailscale") }
+                                    }
+                                    Text("Tailscale doit être connecté sur les deux téléphones. Le réseau VPN est gratuit pour un usage personnel et ne stocke pas tes fichiers.",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = MaterialTheme.typography.bodySmall)
                                     SectionTitle("Connexion directe 5G")
                                     val globalV6 = remember(revision, CloudixStatus.running.value) {
                                         CloudixSettings.globalIpv6Address()
@@ -355,11 +392,26 @@ fun CloudixApp(incoming: String) {
                                             try { Peer.parse(peerLink) } catch (_: Exception) { null }
                                         }
                                         if (paired != null) {
-                                            SettingItem(Icons.Rounded.Public, "Accès 5G direct",
+                                            SettingItem(Icons.Rounded.VpnKey, "VPN Tailscale (5G)",
+                                                paired.tailscale?.let { "Xiaomi : $it — VPN requis sur les deux appareils" }
+                                                    ?: "Configurer l'IP Tailscale 100.x du Xiaomi") {
+                                                TextButton(onClick = {
+                                                    clientTailscaleInput = paired.tailscale.orEmpty()
+                                                    showTailscaleDialog = true
+                                                }) { Text("Configurer") }
+                                            }
+                                            SettingItem(Icons.Rounded.Public, "IPv6 directe",
                                                 if (paired.globalIpv6 == null)
-                                                    "Pas d'IPv6 publique enregistrée : réappaire en Wi-Fi."
-                                                else
-                                                    "IPv6 enregistrée : active la 5G et lance Tester.")
+                                                    "Aucune IPv6 publique enregistrée."
+                                                else if (paired.tailscale != null)
+                                                    "Tailscale a la priorité sur l'IPv6 publique."
+                                                else "IPv6 enregistrée, mais la box peut bloquer les accès.")
+                                            if (paired.tailscale == null) {
+                                                OutlinedButton(onClick = {
+                                                    context.startActivity(Intent(Intent.ACTION_VIEW,
+                                                        Uri.parse("https://play.google.com/store/apps/details?id=com.tailscale.ipn")))
+                                                }) { Text("Installer Tailscale") }
+                                            }
                                         }
                                         if (paired?.globalIpv6 != null) {
                                             SettingItem(Icons.Rounded.SettingsEthernet, "Privilégier IPv6",
@@ -646,6 +698,45 @@ fun CloudixApp(incoming: String) {
                     }
                 }
             }
+        }
+        if (showTailscaleDialog) {
+            AlertDialog(
+                onDismissRequest = { showTailscaleDialog = false },
+                title = { Text("Connexion Tailscale") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Entre l'adresse 100.x affichée dans Tailscale SUR LE XIAOMI. Ne saisis pas celle du Vivo.")
+                        OutlinedTextField(
+                            value = clientTailscaleInput,
+                            onValueChange = { clientTailscaleInput = it.trim() },
+                            label = { Text("IP Tailscale du Xiaomi") },
+                            placeholder = { Text("100.100.100.100") },
+                            singleLine = true
+                        )
+                        Text("La clé d'appairage et la vérification TLS existantes sont conservées.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        try {
+                            val updated = Peer.parse(peerLink)
+                                .withTailnetAddress(clientTailscaleInput.trim()).pairingLink()
+                            settings.peer = updated
+                            peerLink = updated
+                            connectionVerified = false
+                            connectionChecked = false
+                            diagnostic = ""
+                            showTailscaleDialog = false
+                            message = "Adresse Tailscale enregistrée. Active Tailscale sur les deux téléphones, puis appuie sur Tester."
+                        } catch (e: Exception) { report(e) }
+                    }) { Text("Enregistrer") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showTailscaleDialog = false }) { Text("Annuler") }
+                }
+            )
         }
         if (message.isNotEmpty()) {
             AlertDialog(onDismissRequest = { message = "" }, confirmButton = {
