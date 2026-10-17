@@ -107,9 +107,16 @@ fun cloudixScheme(base: ColorScheme, appearance: AppearanceSnapshot, dark: Boole
     var scheme = base.copy(
         primary = primary,
         onPrimary = onTopOf(primary),
-        primaryContainer = if (dark) lerp(primary, backdrop, .72f) else
-            lerp(primary, Color.White, .83f),
+        primaryContainer = when {
+            dark && style == "amoled_plain" -> Color(0xFF141414)
+            dark -> lerp(primary, backdrop, .72f)
+            else -> lerp(primary, Color.White, .83f)
+        },
         onPrimaryContainer = if (dark) Color(0xFFF5EFFF) else lerp(primary, Color.Black, .56f),
+        secondaryContainer = if (dark && style == "amoled_plain") Color(0xFF101010)
+            else base.secondaryContainer,
+        onSecondaryContainer = if (dark && style == "amoled_plain") Color(0xFFF5F1F7)
+            else base.onSecondaryContainer,
         background = backdrop,
         onBackground = foreground,
         surface = surface,
