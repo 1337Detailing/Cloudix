@@ -4,7 +4,7 @@ Audit date: 2026-10-17. **Static code review and Android CI build + lint, not a 
 
 ## Controls reviewed
 - The server requires an explicit Android SAF document-tree grant; does not request broad root/storage permissions.
-- TLS server identity is created in the Android Keystore. The client pins the SHA-256 of the pairing certificate. Hostname verification is replaced by exact cert pinning, not by unauthenticated TLS.
+- The server TLS P-256 identity is generated using standard software crypto for Android Conscrypt compatibility. Its private key and certificate are saved **only as AES-256-GCM ciphertext**, wrapped by an Android Keystore AES key. The client pins the SHA-256 of that pairing certificate. Hostname verification is replaced by exact cert pinning, not by unauthenticated TLS.
 - Every file API checks a 256-bit random bearer secret; token is verified using constant-time byte comparison. Pairing URL and server secret are encrypted at rest with an AES-256-GCM key in Android Keystore (legacy data migrates on access).
 - The file path resolver is relative to the SAF root and rejects `..`, absolute paths, path separators in individual names, and attempts to delete the root.
 - Request headers, request path and upload lengths have limits; uploads stream to SAF without buffering the file into RAM.
@@ -42,8 +42,17 @@ Audit date: 2026-10-17. **Static code review and Android CI build + lint, not a 
 
 ## 0.2 hardening and QA additions
 - Explicit Android Keystore-backed X.509 TLS key manager; in-app local TLS loopback diagnostic and clear client exception classifications.
-- Real instrumented TLS smoke test with Android emulator in `.github/workflows/tls-smoke.yml` (must pass before claiming the original connection issue is fully fixed).
+- Real instrumented TLS smoke test with Android emulator in `.github/workflows/tls-smoke.yml` **PASSED** on GitHub Actions Android 15 emulator after switching from opaque Android Keystore RSA/EC signing to Keystore AES-wrapped software EC keys (workflow run 39048975148). The physical Xiaomi/Vivo pair remains untested.
 - Basic rename API with path-scope validation; client search and sorting; backup-now via WorkManager.
 - 30 accent colors, full palettes, 5 surface intensity levels; no borrowed third-party visuals.
 - Signing config allows Android APK v1/v2/v3/v4 signatures using a private stable keystore supplied only through GitHub Actions secrets. Older temporary debug APK cannot be upgraded directly to the first stable signed release.
 - A green Gradle build is insufficient to establish real-device compatibility; verify emulator TLS and physical Xiaomi↔Vivo testing.
+
+## Result: 2026-10-17 repair verification
+
+- ✅ `assembleDebug`, `lintDebug`, `testDebugUnitTest` passed (GitHub run [39048974830](https://github.com/1337Detailing/Cloudix/actions/runs/39048974830)).
+- ✅ Real TLS client↔server handshake with certificate pinning and a byte-exchange passed on the Android 15 emulator (GitHub run [39048975148](https://github.com/1337Detailing/Cloudix/actions/runs/39048975148)).
+- ⚠️ This is not an end-to-end two-phone file-transfer test. Android SAF permissions, cross-device network isolation, background execution on Xiaomi HyperOS and OriginOS, transfer restart, large files and QR pairing still require physical tests.
+- ⚠️ Root/device compromise can potentially recover credentials while the process is running. No public Internet port exposure is recommended.
+- ⚠️ The former TLS certificate is no longer used; previously paired clients must disconnect and scan a new QR after upgrading.
+- ⚠️ A stably signed release still requires setting the repository GitHub Actions secrets described in README. Without those secrets, GitHub Actions creates only a temporary debug APK which cannot reliably update previous builds.

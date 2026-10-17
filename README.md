@@ -5,7 +5,7 @@ A private, native Android-to-Android file cloud. One APK, two roles: **Server** 
 ## Features (0.2.0)
 - One-tap Server / Client onboarding, Material You wallpaper colors and 30 accents × 5 surface intensities, light/dark modes and optional animations.
 - Android Storage Access Framework (SAF): select a server root directory and grant only that directory access.
-- TLS server with a locally generated Android Keystore identity, 256-bit pairing secret and certificate pinning.
+- TLS server with a locally generated P-256 identity encrypted with an Android Keystore AES key, 256-bit pairing secret and certificate pinning.
 - Transfer files, browse, search, sort by modification date/size/name, rename and create directories, download, delete (with confirmation). Remote browsing requires explicit pairing.
 - QR pairing and pasteable pairing link; no other Android application is required.
 - Scheduled and manual uploads from selected client directories (WorkManager, Wi-Fi-only switch, intervals >= 15 minutes, change-detection).
@@ -60,3 +60,8 @@ When all secrets exist, GitHub Actions signs both debug and release APKs **with 
 2. Xiaomi: start server, then tap **Tester** on the **Diagnostic réseau** row. Success proves Android TLS handshake works locally. On failure, inspect the last connection error shown below the card.
 3. Vivo: use the newest pairing QR, then tap **Tester**. If the local Xiaomi test succeeds but Vivo fails, inspect Wi-Fi IP, client AP isolation and firewall.
 4. Never publish a pairing QR/link; rotating the secret revokes all clients.
+
+## TLS repair (0.2.0)
+The original 0.1 Android TLS handshake failed with `SSLHandshakeException: connection closed`. We reproduced this on a real Android emulator CI test. Opaque Android Keystore private keys caused Conscrypt's RSA operations to fail, and directly stored EC keys also failed. The current implementation uses an exportable per-device software EC P-256 private key, persisted exclusively as Android Keystore AES-GCM ciphertext. **Pinned TLS handshake succeeded** in emulator workflow [39048975148](https://github.com/1337Detailing/Cloudix/actions/runs/39048975148). This does not substitute for physical Xiaomi/Vivo testing. Re-pair after installing 0.2.0 because the server certificate has changed.
+
+UI inspiration: [Clint Gecko](https://github.com/jhaiian/ClintGecko), Material 3 / Compose customization patterns. No Clint code, artwork or brand assets are copied. The original Cloudix theme contains 30 accents × 5 surface intensities, OS wallpaper color fallback, and optional animations.
