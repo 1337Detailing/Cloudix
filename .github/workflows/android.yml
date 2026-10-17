@@ -54,6 +54,27 @@ jobs:
         if: env.CLOUDIX_SIGNED == 'true'
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
+      - name: Reject accidental signing-key rotation
+        if: env.CLOUDIX_SIGNED == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          NEW_APK="app/build/outputs/apk/release/app-release.apk"
+          CERT_LINE='Signer #1 certificate SHA-256 digest:'
+          NEW_CERT="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$NEW_APK" | grep -F "$CERT_LINE" | head -1 | awk '{print $NF}')"
+          test -n "$NEW_CERT"
+          mkdir -p "$RUNNER_TEMP/previous"
+          if gh release view debug-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release download debug-latest --repo "$GITHUB_REPOSITORY" \
+              --pattern cloudix-debug.apk --dir "$RUNNER_TEMP/previous"
+            OLD_CERT="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$RUNNER_TEMP/previous/cloudix-debug.apk" | grep -F "$CERT_LINE" | head -1 | awk '{print $NF}')"
+            test -n "$OLD_CERT"
+            if [[ "$OLD_CERT" != "$NEW_CERT" ]]; then
+              echo "::error::Signing key changed! Refusing to publish an update that Android cannot install over the previous Cloudix release."
+              exit 1
+            fi
+          fi
       - name: Upload signed release
         if: env.CLOUDIX_SIGNED == 'true'
         uses: actions/upload-artifact@v4
