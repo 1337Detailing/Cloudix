@@ -22,13 +22,13 @@ else
     -validity 12000 -dname "CN=Cloudix, OU=Mobile, O=Cloudix, C=FR"
 fi
 read -r -s -p "Mot de passe de la clé PKCS12 : " PASSWORD
-printf '\\n'
+printf '\n'
 if ! keytool -list -keystore "$KEYFILE" -storetype PKCS12 -alias "$ALIAS" -storepass "$PASSWORD" >/dev/null 2>&1; then
   echo "Mot de passe ou alias incorrect : aucun secret GitHub n'a été modifié." >&2
   exit 1
 fi
 echo "Envoi chiffré des secrets à GitHub Actions pour $REPO..."
-base64 < "$KEYFILE" | tr -d '\\n' | gh secret set CLOUDIX_KEYSTORE_B64 --repo "$REPO"
+base64 < "$KEYFILE" | tr -d '\n' | gh secret set CLOUDIX_KEYSTORE_B64 --repo "$REPO"
 printf '%s' "$PASSWORD" | gh secret set CLOUDIX_STORE_PASSWORD --repo "$REPO"
 printf '%s' "$PASSWORD" | gh secret set CLOUDIX_KEY_PASSWORD --repo "$REPO"
 printf '%s' "$ALIAS" | gh secret set CLOUDIX_KEY_ALIAS --repo "$REPO"
