@@ -110,3 +110,26 @@ Official docs: https://tailscale.com/docs/install/android and https://tailscale.
 Manual testing: Open **Thèmes → Couleur d'accent → Moutarde**; verify the top/bottom navigation and home screen change immediately. Select **AMOLED sans teinte** and navigate without restarting. Enter a custom background HEX and confirm an immediate visual change. Restore system wallpaper via Material You. Test switching colors with animations on and off, and restart to confirm persistence.
 
 Caution: arbitrary user-entered text/background colors can have low contrast. Use reset controls if legibility suffers.
+
+## SIGNATURE — Activer les mises à jour intégrées (HTTP 404)
+
+**Pourquoi le message 404 ?** `CloudixUpdater` lit une Release GitHub publique `debug-latest/update.json`. Les artefacts temporaires de GitHub Actions ne sont pas des Releases. Le workflow ne crée la Release que si une **clé de signature Android permanente** est configurée. Une compilation verte seule ne crée pas le canal de mises à jour.
+
+### Configuration unique (ordinateur avec JDK et GitHub CLI)
+
+1. Génère et sauvegarde une clé **privée** permanente (ne jamais la committer dans Git) :
+   ```bash
+   keytool -genkeypair -v -keystore cloudix-release.p12 -storetype PKCS12 -alias cloudix -keyalg RSA -keysize 3072 -validity 10000
+   ```
+   Choisis et conserve le mot de passe. Une sauvegarde sécurisée de la clé et de son mot de passe est indispensable : si la clé est perdue, Android refusera les mises à jour par-dessus les anciennes installations.
+2. Sur GitHub, ouvre **Cloudix → Settings → Secrets and variables → Actions → New repository secret**. Ajoute les quatre secrets suivants (ne partage pas leurs valeurs) :
+   - `CLOUDIX_KEYSTORE_B64` : contenu de `base64` appliqué au fichier `cloudix-release.p12`, sur une seule ligne.
+   - `CLOUDIX_STORE_PASSWORD` : mot de passe du keystore.
+   - `CLOUDIX_KEY_PASSWORD` : mot de passe de la clé (souvent identique).
+   - `CLOUDIX_KEY_ALIAS` : `cloudix`.
+3. Lance **Actions → Android APK → Run workflow** ou pousse un commit sur `main`. Le workflow compile, vérifie la signature de la Release, et publie le canal `debug-latest` uniquement pour un push sur `main`. Le lien `https://github.com/1337Detailing/Cloudix/releases/tag/debug-latest` doit alors exister et contenir `cloudix-debug.apk` et `update.json`.
+4. Installe **une fois** l'APK **Cloudix-release-signed** issue de cette même clé. Les builds suivantes avec la même clé et un `versionCode` supérieur pourront s'installer par-dessus sans supprimer les données.
+
+**Important :** Android n'autorise pas une APK signée avec une nouvelle clé à remplacer une APK déjà installée signée avec une autre clé. La version debug non signée avec la clé permanente peut nécessiter une migration unique (sauvegarde préalable de tes données Cloudix, désinstallation, installation de la version signée). Aucune modification de code ne peut contourner cette vérification système. Les versions suivantes ne nécessiteront plus cette migration tant que la clé et le nom de package restent identiques.
+
+**Sécurité :** ne mets jamais le fichier `.p12` ni les mots de passe dans le dépôt ou dans une conversation. Les fichiers de mise à jour sont validés par SHA-256 et par certificat Android avant installation. Le nom historique `debug-latest` désigne le canal de test, mais l'APK publiée est désormais une **Release signée**.
