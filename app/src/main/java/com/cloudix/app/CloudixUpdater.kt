@@ -58,7 +58,12 @@ object CloudixUpdater {
         val conn = open(CHECK_URL)
         try {
             if (conn.responseCode != 200)
-                throw IOException("Aucune build publique disponible (HTTP ${conn.responseCode}). Configure d'abord la signature GitHub.")
+                throw IOException(
+                    if (conn.responseCode == 404)
+                        "Canal de mise à jour non publié (404). Les APK GitHub Actions ne sont pas des Releases. " +
+                        "Le dépôt doit publier une APK signée avec une clé permanente. Consulte la section SIGNATURE du README."
+                    else "Vérification GitHub impossible (HTTP ${conn.responseCode})."
+                )
             val length = conn.contentLengthLong
             require(length in -1..16_384) { "Métadonnées de mise à jour trop volumineuses" }
             val data = conn.inputStream.use { stream ->
@@ -114,7 +119,7 @@ object CloudixUpdater {
         target.delete()
         val conn = open(info.url)
         try {
-            if (conn.responseCode != 200) throw IOException("GitHub ne propose pas encore l'APK (HTTP ${conn.responseCode}).")
+            if (conn.responseCode != 200) throw IOException("APK signée indisponible sur GitHub Releases (HTTP ${conn.responseCode}).")
             val total = conn.contentLengthLong
             require(total in -1..MAX_APK_BYTES) { "APK trop volumineuse" }
             val digest = MessageDigest.getInstance("SHA-256")
