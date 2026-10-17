@@ -15,6 +15,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -67,13 +69,11 @@ fun CloudixScaffold(
                         .padding(start = 22.dp, end = 20.dp, top = 14.dp, bottom = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(Modifier.size(52.dp).clip(RoundedCornerShape(20.dp))
-                        .background(Brush.linearGradient(
-                            listOf(MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.tertiary))),
-                        contentAlignment = Alignment.Center) {
-                        Icon(Icons.Rounded.Cloud, null, tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(27.dp))
+                    Box(Modifier.size(52.dp).clip(RoundedCornerShape(16.dp))
+                        .background(Color.Black), contentAlignment = Alignment.Center) {
+                        Image(painterResource(R.drawable.ic_launcher_foreground),
+                            contentDescription = "Logo Cloudix",
+                            modifier = Modifier.fillMaxSize())
                     }
                     Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f)) {
@@ -124,14 +124,12 @@ fun WelcomeScreen(onServer: () -> Unit, onClient: () -> Unit) {
         verticalArrangement = Arrangement.Center
     ) {
         Spacer(Modifier.height(36.dp))
-        Box(
-            Modifier.size(96.dp).clip(RoundedCornerShape(32.dp))
-                .background(Brush.linearGradient(listOf(
-                    MaterialTheme.colorScheme.primary,
-                    MaterialTheme.colorScheme.tertiary))),
-            contentAlignment = Alignment.Center
-        ) { Icon(Icons.Rounded.CloudSync, null, tint = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.size(50.dp)) }
+        Box(Modifier.size(96.dp).clip(RoundedCornerShape(28.dp))
+            .background(Color.Black), contentAlignment = Alignment.Center) {
+            Image(painterResource(R.drawable.ic_launcher_foreground),
+                contentDescription = "Logo Cloudix",
+                modifier = Modifier.fillMaxSize())
+        }
         Spacer(Modifier.height(30.dp))
         Text("Bienvenue sur", style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
