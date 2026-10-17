@@ -23,11 +23,15 @@ import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLServerSocket
+import javax.net.ssl.SSLSocket
+import android.util.Log
 import kotlin.concurrent.thread
 
 object CloudixStatus {
     val running = mutableStateOf(false)
     val error = mutableStateOf("")
+    val lastConnectionIssue = mutableStateOf("")
+    val successfulRequests = mutableStateOf(0)
 }
 class CloudixService : Service() {
     private var server: SSLServerSocket? = null
@@ -75,11 +79,24 @@ class CloudixService : Service() {
                     it == "TLSv1.3" || it == "TLSv1.2"
                 }.toTypedArray()
                 CloudixStatus.error.value = ""
+                CloudixStatus.lastConnectionIssue.value = ""
                 CloudixStatus.running.value = true
                 while (active) {
                     val client = socket.accept()
                     try {
-                        pool.execute { client.use { serve(it) } }
+                        pool.execute { client.use {
+                            try {
+                                val ssl = it as SSLSocket
+                                ssl.soTimeout = 15_000
+                                ssl.startHandshake()
+                                ssl.soTimeout = 70_000
+                                serve(ssl)
+                            } catch (e: Exception) {
+                                CloudixStatus.lastConnectionIssue.value =
+                                    "${e.javaClass.simpleName}: ${e.message?.take(140) ?: "Négociation interrompue"}"
+                                Log.w("Cloudix", "Connexion TLS/HTTP refusée", e)
+                            }
+                        } }
                     } catch (_: java.util.concurrent.RejectedExecutionException) {
                         client.close()
                     }
@@ -186,6 +203,10 @@ class CloudixService : Service() {
             fun arg(name: String): String = url.getQueryParameter(name) ?: ""
             val path = arg("path")
             when {
+                method == "GET" && url.path == "/api/ping" -> {
+                    response(out, 200, JSONObject().put("status", "ok").toString().toByteArray())
+                    CloudixStatus.successfulRequests.value += 1
+                }
                 method == "GET" && url.path == "/api/list" -> {
                     val dir = locate(path)
                     require(dir.isDirectory) { "Pas un dossier" }
@@ -197,6 +218,7 @@ class CloudixService : Service() {
                             .put("directory", file.isDirectory).put("size", file.length()))
                     }
                     response(out, 200, array.toString().toByteArray())
+                    CloudixStatus.successfulRequests.value += 1
                 }
                 method == "GET" && url.path == "/api/file" -> {
                     val file = locate(path)
@@ -261,6 +283,8 @@ class CloudixService : Service() {
                     is IllegalArgumentException -> 400
                     else -> 500
                 }
+                CloudixStatus.lastConnectionIssue.value = "${e.javaClass.simpleName}: ${e.message?.take(140) ?: "erreur serveur"}"
+                Log.w("Cloudix", "Requête refusée", e)
                 json(out, status, if (status == 500) "Erreur interne" else (e.message ?: "Erreur"))
             } catch (_: Exception) { /* client disconnected */ }
         }

@@ -6,6 +6,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.HttpURLConnection
@@ -15,7 +16,11 @@ import java.security.KeyStore
 import java.security.MessageDigest
 import java.security.cert.X509Certificate
 import javax.net.ssl.HttpsURLConnection
-import javax.net.ssl.KeyManagerFactory
+import javax.net.ssl.KeyManager
+import javax.net.ssl.X509ExtendedKeyManager
+import javax.net.ssl.SSLSocket
+import java.net.Socket
+import javax.net.ssl.SSLEngine
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
@@ -48,9 +53,27 @@ object TlsIdentity {
         return CloudixSettings.fingerprint(cert.encoded)
     }
     fun serverContext(): SSLContext {
-        val km = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
-        km.init(keyStore(), null)
-        return SSLContext.getInstance("TLS").apply { init(km.keyManagers, null, null) }
+        // Some AndroidKeyStore implementations don't enumerate aliases via the
+        // platform's default KeyManagerFactory. Supply the Keystore identity explicitly.
+        val ks = keyStore()
+        val key = ks.getKey(ALIAS, null) as java.security.PrivateKey
+        val chain = ks.getCertificateChain(ALIAS).map { it as X509Certificate }.toTypedArray()
+        require(chain.isNotEmpty()) { "Certificat TLS introuvable" }
+        val manager = object : X509ExtendedKeyManager() {
+            override fun getClientAliases(keyType: String?, issuers: Array<java.security.Principal>?): Array<String> = emptyArray()
+            override fun chooseClientAlias(keyType: Array<String>?, issuers: Array<java.security.Principal>?, socket: Socket?): String? = null
+            override fun getServerAliases(keyType: String?, issuers: Array<java.security.Principal>?): Array<String> =
+                if (keyType.equals("RSA", true)) arrayOf(ALIAS) else emptyArray()
+            override fun chooseServerAlias(keyType: String?, issuers: Array<java.security.Principal>?, socket: Socket?): String? =
+                if (keyType.equals("RSA", true)) ALIAS else null
+            override fun chooseEngineServerAlias(keyType: String?, issuers: Array<java.security.Principal>?, engine: SSLEngine?): String? =
+                if (keyType.equals("RSA", true)) ALIAS else null
+            override fun getCertificateChain(alias: String?): Array<X509Certificate>? =
+                if (alias == ALIAS) chain else null
+            override fun getPrivateKey(alias: String?): java.security.PrivateKey? =
+                if (alias == ALIAS) key else null
+        }
+        return SSLContext.getInstance("TLS").apply { init(arrayOf<KeyManager>(manager), null, null) }
     }
     fun clientContext(pin: String): SSLContext {
         require(pin.matches(Regex("[0-9a-f]{64}"))) { "Empreinte TLS invalide" }
@@ -108,9 +131,15 @@ class CloudixClient(val peer: Peer) {
     private fun request(route: String, method: String = "GET"): String {
         val conn = connection(route, method)
         try {
-            if (conn.responseCode !in 200..299) throw Exception("Serveur: HTTP ${conn.responseCode}")
+            if (conn.responseCode !in 200..299) throw CloudixNetworkFailure.http(conn.responseCode, conn.errorStream)
             return conn.inputStream.bufferedReader().use { it.readText() }
-        } finally { conn.disconnect() }
+        } catch (e: Exception) { throw CloudixNetworkFailure.describe(e) }
+        finally { conn.disconnect() }
+    }
+    fun ping(): Long {
+        val started = System.nanoTime()
+        request("/api/ping")
+        return (System.nanoTime() - started) / 1_000_000
     }
     fun list(path: String): List<RemoteFile> {
         val items = JSONArray(request("/api/list?path=${Uri.encode(path)}"))
@@ -133,17 +162,38 @@ class CloudixClient(val peer: Peer) {
             conn.setRequestProperty("Content-Type", "application/octet-stream")
             conn.setFixedLengthStreamingMode(length)
             conn.outputStream.use { out -> source.use { copyExactly(it, out, length) } }
-            if (conn.responseCode !in 200..299) throw Exception("Upload refusé (HTTP ${conn.responseCode})")
-        } finally { conn.disconnect() }
+            if (conn.responseCode !in 200..299) throw CloudixNetworkFailure.http(conn.responseCode, conn.errorStream)
+        } catch (e: Exception) { throw CloudixNetworkFailure.describe(e) }
+        finally { conn.disconnect() }
     }
     fun download(path: String, sink: OutputStream) {
         val conn = connection("/api/file?path=${Uri.encode(path)}")
         try {
-            if (conn.responseCode != 200) throw Exception("Téléchargement impossible (HTTP ${conn.responseCode})")
+            if (conn.responseCode != 200) throw CloudixNetworkFailure.http(conn.responseCode, conn.errorStream)
             conn.inputStream.use { input -> sink.use { output -> input.copyTo(output, 65536) } }
-        } finally { conn.disconnect() }
+        } catch (e: Exception) { throw CloudixNetworkFailure.describe(e) }
+        finally { conn.disconnect() }
     }
 }
+object CloudixNetworkFailure {
+    fun describe(error: Exception): Exception {
+        if (error is CloudixConnectionException) return error
+        val message = when (error) {
+            is java.net.ConnectException -> "Serveur inaccessible. Vérifie que Cloudix est démarré sur le Xiaomi et que les appareils partagent le même Wi-Fi."
+            is java.net.SocketTimeoutException -> "Délai dépassé. Vérifie l’adresse Wi-Fi, le pare-feu et l’isolation des appareils sur le routeur."
+            is javax.net.ssl.SSLHandshakeException -> "Échec de la connexion sécurisée TLS : ${error.message ?: "certificat ou protocole"}. Essaie le test local sur le Xiaomi et réappaire les téléphones."
+            is java.io.EOFException -> "Connexion fermée avant la réponse. Lance le diagnostic TLS sur le Xiaomi."
+            is java.net.SocketException -> "Connexion fermée par le serveur. Lance le diagnostic local sur le Xiaomi (erreur : ${error.message ?: "socket"})."
+            else -> error.message ?: "Erreur de connexion inconnue"
+        }
+        return CloudixConnectionException(message, error)
+    }
+    fun http(code: Int, stream: InputStream?): Exception {
+        val response = try { stream?.bufferedReader()?.use { it.readText().take(300) } } catch (_: Exception) { null }
+        return CloudixConnectionException("Serveur HTTP $code : ${response ?: "requête refusée"}")
+    }
+}
+class CloudixConnectionException(message: String, cause: Throwable? = null): IOException(message, cause)
 fun copyExactly(source: InputStream, target: OutputStream, length: Long) {
     var remain = length
     val buffer = ByteArray(65536)
