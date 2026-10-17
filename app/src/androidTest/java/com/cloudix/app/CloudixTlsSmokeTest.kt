@@ -19,7 +19,7 @@ import javax.net.ssl.SSLSocket
 class CloudixTlsSmokeTest {
     @Test fun keystoreServerAndPinnedClientCompleteHandshake() {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
-        val tls = TlsIdentity.serverContext()
+        val tls = TlsIdentity.serverContext(ctx)
         val pin = TlsIdentity.fingerprint(ctx)
         val executor = Executors.newSingleThreadExecutor()
         val serverFailure = AtomicReference<Throwable?>(null)

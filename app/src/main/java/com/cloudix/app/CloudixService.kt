@@ -72,7 +72,7 @@ class CloudixService : Service() {
         active = true
         thread(name = "cloudix-listener", isDaemon = true) {
             try {
-                val socket = TlsIdentity.serverContext().serverSocketFactory
+                val socket = TlsIdentity.serverContext(this).serverSocketFactory
                     .createServerSocket(8731, 12) as SSLServerSocket
                 server = socket
                 socket.enabledProtocols = socket.supportedProtocols.filter {

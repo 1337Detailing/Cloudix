@@ -71,6 +71,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.0")
     implementation("androidx.documentfile:documentfile:1.0.1")
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.80")
     implementation("androidx.work:work-runtime-ktx:2.10.1")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     debugImplementation("androidx.compose.ui:ui-tooling")

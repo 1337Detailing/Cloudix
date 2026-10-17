@@ -4,78 +4,155 @@ import android.content.Context
 import android.net.Uri
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
+import android.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
+import org.bouncycastle.asn1.x500.X500Name
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
+import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
-import java.net.HttpURLConnection
 import java.net.URL
+import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.MessageDigest
+import java.security.PrivateKey
+import java.security.SecureRandom
+import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
+import java.security.spec.ECGenParameterSpec
+import java.security.spec.PKCS8EncodedKeySpec
+import java.util.Date
+import java.math.BigInteger
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
 import javax.net.ssl.HttpsURLConnection
-import javax.net.ssl.KeyManager
-import javax.net.ssl.X509ExtendedKeyManager
-import javax.net.ssl.SSLSocket
-import java.net.Socket
-import javax.net.ssl.SSLEngine
+import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
-import javax.security.auth.x500.X500Principal
 
+/**
+ * Android's TLS/Conscrypt engine does not reliably handshake with opaque
+ * AndroidKeyStore RSA/EC server keys on all devices.
+ *
+ * Solution: standard EC P-256 identity in memory; it is persisted only as
+ * AES-GCM ciphertext whose wrapping key stays in AndroidKeyStore.
+ * Certificate pinning and bearer authentication remain mandatory.
+ */
 object TlsIdentity {
-    private const val ALIAS = "cloudix-server-ec-v2"
-    fun keyStore(): KeyStore {
-        val ks = KeyStore.getInstance("AndroidKeyStore")
-        ks.load(null)
-        if (!ks.containsAlias(ALIAS)) {
-            val generator = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC, "AndroidKeyStore")
-            generator.initialize(
-                KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY)
-                    .setAlgorithmParameterSpec(java.security.spec.ECGenParameterSpec("secp256r1"))
-                    .setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA384,
-                        KeyProperties.DIGEST_SHA512)
-                    .setCertificateSubject(X500Principal("CN=Cloudix"))
-                    .setCertificateSerialNumber(java.math.BigInteger.ONE)
-                    .setCertificateNotBefore(java.util.Date(System.currentTimeMillis() - 86_400_000))
-                    .setCertificateNotAfter(java.util.Date(System.currentTimeMillis() + 3650L * 86_400_000))
-                    .build()
-            )
-            generator.generateKeyPair()
+    private const val PREFS = "cloudix_tls_identity"
+    private const val ALIAS = "cloudix-tls-wrap-v3"
+    private val lock = Any()
+    private data class Identity(val privateKey: PrivateKey, val cert: X509Certificate)
+    @Volatile private var cache: Identity? = null
+
+    private fun wrapKey(): SecretKey {
+        val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        (store.getKey(ALIAS, null) as? SecretKey)?.let { return it }
+        val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        generator.init(KeyGenParameterSpec.Builder(ALIAS,
+                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+            .setKeySize(256)
+            .build())
+        return generator.generateKey()
+    }
+
+    private fun encrypt(data: ByteArray): String {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, wrapKey())
+        val result = cipher.iv + cipher.doFinal(data)
+        return Base64.encodeToString(result, Base64.NO_WRAP)
+    }
+
+    private fun decrypt(value: String): ByteArray {
+        val raw = Base64.decode(value, Base64.DEFAULT)
+        require(raw.size > 28) { "Identité TLS corrompue" }
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE, wrapKey(),
+            GCMParameterSpec(128, raw.copyOfRange(0, 12)))
+        return cipher.doFinal(raw.copyOfRange(12, raw.size))
+    }
+
+    private fun generate(): Identity {
+        val pair = KeyPairGenerator.getInstance("EC").apply {
+            initialize(ECGenParameterSpec("secp256r1"), SecureRandom())
+        }.generateKeyPair()
+        val now = System.currentTimeMillis()
+        val distinguishedName = X500Name("CN=Cloudix Local")
+        val certificateBuilder = JcaX509v3CertificateBuilder(
+            distinguishedName,
+            BigInteger(128, SecureRandom()).abs().add(BigInteger.ONE),
+            Date(now - 86_400_000L),
+            Date(now + 10L * 365 * 86_400_000L),
+            distinguishedName,
+            pair.public
+        )
+        val signed = certificateBuilder.build(
+            JcaContentSignerBuilder("SHA256withECDSA").build(pair.private))
+        val cert = JcaX509CertificateConverter().getCertificate(signed)
+        cert.verify(pair.public)
+        cert.checkValidity()
+        return Identity(pair.private, cert)
+    }
+
+    private fun identity(context: Context): Identity {
+        cache?.let { return it }
+        synchronized(lock) {
+            cache?.let { return it }
+            val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val saved = prefs.getString("wrapped_identity", null)
+            val id = if (saved != null) {
+                val data = JSONObject(decrypt(saved).toString(Charsets.UTF_8))
+                val pkcs8 = Base64.decode(data.getString("private"), Base64.NO_WRAP)
+                val der = Base64.decode(data.getString("certificate"), Base64.NO_WRAP)
+                val privateKey = KeyFactory.getInstance("EC")
+                    .generatePrivate(PKCS8EncodedKeySpec(pkcs8))
+                val cert = CertificateFactory.getInstance("X.509")
+                    .generateCertificate(der.inputStream()) as X509Certificate
+                cert.checkValidity()
+                Identity(privateKey, cert)
+            } else {
+                val created = generate()
+                val data = JSONObject()
+                    .put("private", Base64.encodeToString(created.privateKey.encoded, Base64.NO_WRAP))
+                    .put("certificate", Base64.encodeToString(created.cert.encoded, Base64.NO_WRAP))
+                check(prefs.edit().putString("wrapped_identity",
+                    encrypt(data.toString().toByteArray(Charsets.UTF_8))).commit()) {
+                    "Impossible de conserver l'identité TLS"
+                }
+                created
+            }
+            cache = id
+            return id
         }
-        return ks
     }
-    fun fingerprint(context: Context): String {
-        val cert = keyStore().getCertificate(ALIAS)
-        return CloudixSettings.fingerprint(cert.encoded)
-    }
-    fun serverContext(): SSLContext {
-        // P-256 ECDSA avoids Android Conscrypt RSA-PSS raw-key incompatibilities.
-        // Some AndroidKeyStore implementations don't enumerate aliases via the
-        // platform's default KeyManagerFactory. Supply the Keystore identity explicitly.
-        val ks = keyStore()
-        val key = ks.getKey(ALIAS, null) as java.security.PrivateKey
-        val chain = ks.getCertificateChain(ALIAS).map { it as X509Certificate }.toTypedArray()
-        require(chain.isNotEmpty()) { "Certificat TLS introuvable" }
-        val manager = object : X509ExtendedKeyManager() {
-            override fun getClientAliases(keyType: String?, issuers: Array<java.security.Principal>?): Array<String> = emptyArray()
-            override fun chooseClientAlias(keyType: Array<String>?, issuers: Array<java.security.Principal>?, socket: Socket?): String? = null
-            override fun getServerAliases(keyType: String?, issuers: Array<java.security.Principal>?): Array<String> =
-                if (keyType.equals("EC", true) || keyType.equals("ECDSA", true)) arrayOf(ALIAS) else emptyArray()
-            override fun chooseServerAlias(keyType: String?, issuers: Array<java.security.Principal>?, socket: Socket?): String? =
-                if (keyType.equals("EC", true) || keyType.equals("ECDSA", true)) ALIAS else null
-            override fun chooseEngineServerAlias(keyType: String?, issuers: Array<java.security.Principal>?, engine: SSLEngine?): String? =
-                if (keyType.equals("RSA", true)) ALIAS else null
-            override fun getCertificateChain(alias: String?): Array<X509Certificate>? =
-                if (alias == ALIAS) chain else null
-            override fun getPrivateKey(alias: String?): java.security.PrivateKey? =
-                if (alias == ALIAS) key else null
+
+    fun fingerprint(context: Context): String =
+        CloudixSettings.fingerprint(identity(context).cert.encoded)
+
+    fun serverContext(context: Context): SSLContext {
+        val identity = identity(context)
+        val storePassword = "cloudix-ephemeral-keystore".toCharArray()
+        val store = KeyStore.getInstance("PKCS12").apply {
+            load(null, storePassword)
+            setKeyEntry("server", identity.privateKey, storePassword,
+                arrayOf(identity.cert))
         }
-        return SSLContext.getInstance("TLS").apply { init(arrayOf<KeyManager>(manager), null, null) }
+        val factory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
+        factory.init(store, storePassword)
+        return SSLContext.getInstance("TLS").apply {
+            init(factory.keyManagers, null, SecureRandom())
+        }
     }
+
     fun clientContext(pin: String): SSLContext {
         require(pin.matches(Regex("[0-9a-f]{64}"))) { "Empreinte TLS invalide" }
         val trust = object : X509TrustManager {
