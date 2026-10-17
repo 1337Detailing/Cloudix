@@ -2,8 +2,10 @@ name: Android APK
 on:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
+  # Visit the signing cache regularly: GitHub may evict idle caches.
+  schedule:
+    - cron: '17 4 * * 1,4'
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -19,6 +21,38 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Restore Cloudix's consistent Android debug certificate
+        id: key-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: cloudix-debug-signing-v1
+      - name: Bootstrap signing key once; refuse accidental key rotation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.android"
+          if [[ ! -f "$HOME/.android/debug.keystore" ]]; then
+            if gh release view debug-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo "::error::Previous Cloudix release exists but original signing key is missing. Stop to prevent an incompatible Android update."
+              exit 1
+            fi
+            # The same approach as Routix. Future workflows restore this exact key.
+            keytool -genkeypair -keystore "$HOME/.android/debug.keystore" \
+              -storepass android -alias androiddebugkey -keypass android \
+              -keyalg RSA -keysize 3072 -validity 12000 \
+              -dname "CN=Cloudix Debug,OU=Mobile,O=Cloudix,C=FR"
+          fi
+          keytool -list -v -keystore "$HOME/.android/debug.keystore" \
+            -storepass android -alias androiddebugkey | grep -E 'SHA256:|Valid from:'
+      - name: Persist key for the next run (only on first build)
+        if: steps.key-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: cloudix-debug-signing-v1
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
@@ -27,87 +61,70 @@ jobs:
           echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
           SDK_MANAGER="$(find /usr/local/lib/android/sdk/cmdline-tools -type f -name sdkmanager | head -n 1)"
           "$SDK_MANAGER" --install "platforms;android-35" "build-tools;35.0.0"
-      - name: Configure stable signing if secrets are available
-        env:
-          CLOUDIX_KEYSTORE_B64: ${{ secrets.CLOUDIX_KEYSTORE_B64 }}
-          CLOUDIX_STORE_PASSWORD: ${{ secrets.CLOUDIX_STORE_PASSWORD }}
-          CLOUDIX_KEY_PASSWORD: ${{ secrets.CLOUDIX_KEY_PASSWORD }}
-          CLOUDIX_KEY_ALIAS: ${{ secrets.CLOUDIX_KEY_ALIAS }}
-        run: |
-          if [[ -n "$CLOUDIX_KEYSTORE_B64" && -n "$CLOUDIX_STORE_PASSWORD" && -n "$CLOUDIX_KEY_PASSWORD" ]]; then
-            printf '%s' "$CLOUDIX_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/cloudix-release.p12"
-            chmod 600 "$RUNNER_TEMP/cloudix-release.p12"
-            echo "CLOUDIX_KEYSTORE_PATH=$RUNNER_TEMP/cloudix-release.p12" >> "$GITHUB_ENV"
-            echo "CLOUDIX_STORE_PASSWORD=$CLOUDIX_STORE_PASSWORD" >> "$GITHUB_ENV"
-            echo "CLOUDIX_KEY_PASSWORD=$CLOUDIX_KEY_PASSWORD" >> "$GITHUB_ENV"
-            echo "CLOUDIX_KEY_ALIAS=${CLOUDIX_KEY_ALIAS:-cloudix}" >> "$GITHUB_ENV"
-            echo "CLOUDIX_SIGNED=true" >> "$GITHUB_ENV"
-          else
-            echo "::notice::No signing secrets: ephemeral debug APK only (not update-compatible)."
-          fi
-      - name: Audit and compile debug APK
+      - name: Audit, unit tests, and build the stable-signature debug APK
         run: gradle --no-daemon --stacktrace :app:assembleDebug :app:lintDebug :app:testDebugUnitTest
-      - name: Build upgrade-compatible release APK
-        if: env.CLOUDIX_SIGNED == 'true'
-        run: gradle --no-daemon :app:assembleRelease
-      - name: Verify release signature
-        if: env.CLOUDIX_SIGNED == 'true'
-        run: |
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
-      - name: Reject accidental signing-key rotation
-        if: env.CLOUDIX_SIGNED == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Verify APK certificate and version
+        shell: bash
         run: |
           set -euo pipefail
-          NEW_APK="app/build/outputs/apk/release/app-release.apk"
-          CERT_LINE='Signer #1 certificate SHA-256 digest:'
-          NEW_CERT="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$NEW_APK" | grep -F "$CERT_LINE" | head -1 | awk '{print $NF}')"
-          test -n "$NEW_CERT"
-          mkdir -p "$RUNNER_TEMP/previous"
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK"
+          EXPECTED_VERSION="$((1000 + GITHUB_RUN_NUMBER))"
+          ACTUAL_VERSION="$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p" | head -n 1)"
+          if [[ "$ACTUAL_VERSION" != "$EXPECTED_VERSION" ]]; then
+            echo "::error::versionCode mismatch: expected $EXPECTED_VERSION, got $ACTUAL_VERSION"
+            exit 1
+          fi
+      - name: Prevent Android certificate change from previously published APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
           if gh release view debug-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            mkdir -p "$RUNNER_TEMP/cloudix-previous"
             gh release download debug-latest --repo "$GITHUB_REPOSITORY" \
-              --pattern cloudix-debug.apk --dir "$RUNNER_TEMP/previous"
-            OLD_CERT="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$RUNNER_TEMP/previous/cloudix-debug.apk" | grep -F "$CERT_LINE" | head -1 | awk '{print $NF}')"
-            test -n "$OLD_CERT"
-            if [[ "$OLD_CERT" != "$NEW_CERT" ]]; then
-              echo "::error::Signing key changed! Refusing to publish an update that Android cannot install over the previous Cloudix release."
+              --pattern cloudix-debug.apk --dir "$RUNNER_TEMP/cloudix-previous"
+            SIGNER_LINE='Signer #1 certificate SHA-256 digest:'
+            OLD="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$RUNNER_TEMP/cloudix-previous/cloudix-debug.apk" | grep -F "$SIGNER_LINE" | head -n 1 | awk '{print $NF}')"
+            NEW="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs app/build/outputs/apk/debug/app-debug.apk | grep -F "$SIGNER_LINE" | head -n 1 | awk '{print $NF}')"
+            test -n "$OLD" && test -n "$NEW"
+            if [[ "$OLD" != "$NEW" ]]; then
+              echo "::error::Cloudix signing key changed. Refusing to publish an update that would require uninstalling the app."
               exit 1
             fi
           fi
-      - name: Upload signed release
-        if: env.CLOUDIX_SIGNED == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: Cloudix-release-signed
-          path: app/build/outputs/apk/release/app-release.apk
-          if-no-files-found: error
-      - name: Publish signed debug update channel
-        if: env.CLOUDIX_SIGNED == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Publish installable debug APK and update metadata
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
           set -euo pipefail
-          # Publish the verified stable-key release APK, never the ephemeral debug APK.
-          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/cloudix-debug.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/cloudix-debug.apk"
           DIGEST="$(sha256sum "$RUNNER_TEMP/cloudix-debug.apk" | cut -d' ' -f1)"
           VERSION_CODE="$((1000 + GITHUB_RUN_NUMBER))"
-          # The release and metadata must describe exactly the same signed artifact.
-          test -s "$RUNNER_TEMP/cloudix-debug.apk"
-          test -n "$DIGEST"
-          printf '{"versionCode":%d,"sha256":"%s","url":"https://github.com/1337Detailing/Cloudix/releases/download/debug-latest/cloudix-debug.apk","title":"Build debug #%s"}' "$VERSION_CODE" "$DIGEST" "$GITHUB_RUN_NUMBER" > "$RUNNER_TEMP/update.json"
+          printf '{"versionCode":%d,"sha256":"%s","url":"https://github.com/1337Detailing/Cloudix/releases/download/debug-latest/cloudix-debug.apk","title":"Build debug #%s"}\n' \
+            "$VERSION_CODE" "$DIGEST" "$GITHUB_RUN_NUMBER" > "$RUNNER_TEMP/update.json"
+          python3 -m json.tool "$RUNNER_TEMP/update.json" >/dev/null
           if gh release view debug-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload debug-latest "$RUNNER_TEMP/cloudix-debug.apk" "$RUNNER_TEMP/update.json" --clobber --repo "$GITHUB_REPOSITORY"
+            gh release upload debug-latest "$RUNNER_TEMP/cloudix-debug.apk" "$RUNNER_TEMP/update.json" \
+              --clobber --repo "$GITHUB_REPOSITORY"
           else
-            gh release create debug-latest "$RUNNER_TEMP/cloudix-debug.apk" "$RUNNER_TEMP/update.json" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Cloudix debug (mise à jour intégrée)" --notes "Canal de test signé en continu. APK vérifiée par l'application avant installation." --prerelease
+            gh release create debug-latest "$RUNNER_TEMP/cloudix-debug.apk" "$RUNNER_TEMP/update.json" \
+              --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "Cloudix bêta · mises à jour intégrées" \
+              --notes "Build debug signée avec la même clé conservée par GitHub Actions. APK vérifiée avant installation." --prerelease
           fi
-      - name: Signing status notice
-        if: env.CLOUDIX_SIGNED != 'true'
-        run: |
-          echo "::warning::Cloudix cannot publish in-app updates without the four stable signing secrets. GitHub Actions APKs are temporary builds; see README signing instructions."
-      - name: Upload Cloudix APK
+          mkdir -p "$RUNNER_TEMP/check-published"
+          gh release download debug-latest --repo "$GITHUB_REPOSITORY" \
+            --pattern update.json --dir "$RUNNER_TEMP/check-published"
+          python3 -m json.tool "$RUNNER_TEMP/check-published/update.json" >/dev/null
+      - name: Upload downloadable Android APK
         uses: actions/upload-artifact@v4
         with:
           name: Cloudix-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 30

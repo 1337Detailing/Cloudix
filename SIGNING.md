@@ -1,65 +1,26 @@
-# Cloudix : mises à jour APK signées
+# Signature des mises à jour Cloudix — même principe que Routix
 
-Android exige **le même certificat de signature** pour mettre à jour une application sans désinstallation. Le nom de package reste `com.cloudix.app` et `versionCode` augmente automatiquement sur GitHub Actions.
+**Aucune configuration manuelle, aucun secret GitHub à créer.** Cloudix utilise la même stratégie que le workflow officiel Routix : une clé de signature debug Android générée une seule fois par GitHub Actions, conservée dans le cache `cloudix-debug-signing-v1` et restaurée pour chaque build suivante.
 
-## Important : version déjà installée
+À chaque push sur `main`, la CI :
+1. réutilise la même clé de signature ;
+2. compile `app-debug.apk`, exécute tests et Android Lint ;
+3. vérifie le certificat APK et la progression du `versionCode` ;
+4. refuse de publier si l'empreinte du certificat ne correspond pas à la dernière APK publiée ;
+5. publie `cloudix-debug.apk` et `update.json` dans la release GitHub publique [debug-latest](https://github.com/1337Detailing/Cloudix/releases/tag/debug-latest).
 
-Les anciennes APK `Cloudix-debug-apk` générées par GitHub Actions **sans clé stable** utilisent une clé de débogage éphémère. Elles ne peuvent pas être mises à jour par une APK signée avec une nouvelle clé : Android refusera l'installation. **Une seule réinstallation est nécessaire** pour passer à la première version stable. Ensuite, toutes les versions signées avec **la même clé** s'installent par-dessus sans perdre les données de l'application.
+Cloudix télécharge la nouvelle APK, vérifie son SHA-256 **et le certificat de signature Android correspondant à l'installation actuelle**, puis ouvre l'installateur système. La validation par l'utilisateur reste obligatoire sur Android.
 
-Avant la première réinstallation, exporte/sauvegarde les fichiers importants et note tes dossiers sélectionnés. Ne supprime pas l'application serveur sans t'assurer que tes données sont ailleurs.
+## Transition depuis une ancienne APK Cloudix
 
-## Installation guidée (recommandée)
+La signature d'une ancienne build GitHub Actions construite avant ce changement de cache n'a pas été conservée. Android **ne permet pas de la remplacer par une APK portant une autre signature**. Si l'installateur affiche un conflit de package, une unique désinstallation de l'ancienne Cloudix pourra être nécessaire. Ensuite, les builds de la nouvelle chaîne conservent la même signature.
 
-Sur un PC avec **JDK** et **GitHub CLI** connecté à ton compte (`gh auth login`), tu peux exécuter le script `scripts/setup-signing.sh` depuis le dépôt Cloudix. Il crée la clé dans `~/cloudix-signing/cloudix-release.p12`, puis configure automatiquement les quatre secrets du dépôt GitHub via une connexion authentifiée. La clé n'est jamais commitée dans le dépôt.
+**Avant toute désinstallation**, sauvegarde les dossiers et paramètres importants ; les données internes de l'application seront effacées. Ne supprime jamais tes dossiers de fichiers partagés.
 
-Après configuration, lance **Actions → Android APK → Run workflow**. Une nouvelle compilation publiera la Release `debug-latest`, contenant l'APK signée et le manifeste de mise à jour. Conserve une copie privée du fichier `.p12` et son mot de passe : sans eux, les prochaines APK ne pourront plus être mises à jour par-dessus.
+## Limitation du cache (important)
 
-**Attention :** une build GitHub verte ne prouve pas que la Release est publiée. La publication reste désactivée tant que les secrets ne sont pas configurés.
+Cette approche **de bêta personnelle** évite toute configuration, mais sa clé stockée en cache GitHub n'a pas la durabilité ni l'isolation d'une vraie clé privée de production. Une éviction du cache pourrait faire perdre la clé. GitHub Actions est donc programmé deux fois par semaine pour maintenir le cache actif. Si le cache disparaît alors qu'une release existe, la CI **échoue volontairement**, au lieu de créer silencieusement une clé incompatible.
 
-## Créer une clé privée stable (à conserver)
+Ne te sers pas de ce système pour une distribution publique hautement sensible ou sur Play Store. Une clé de production stockée dans un secret privé reste préférable pour cette utilisation. Le certificat APK de mise à jour est distinct de la clé TLS utilisée pour protéger les fichiers Cloudix.
 
-Sur ton PC, avec JDK 17 ou supérieur :
-
-```bash
-keytool -genkeypair -v -keystore cloudix-release.p12 -storetype PKCS12 \
-  -alias cloudix -keyalg RSA -keysize 3072 -sigalg SHA256withRSA -validity 12000
-```
-
-Choisis un mot de passe long et unique. Garde une copie chiffrée de `cloudix-release.p12` **hors de GitHub**. Ne commite jamais cette clé.
-
-Encode le fichier en base64 sur ton ordinateur :
-
-- Linux : `base64 -w0 cloudix-release.p12`
-- macOS : `base64 < cloudix-release.p12 | tr -d '\\n'`
-- Windows PowerShell : `[Convert]::ToBase64String([IO.File]::ReadAllBytes("cloudix-release.p12"))`
-
-## GitHub Secrets
-
-Ouvre **Settings → Secrets and variables → Actions → New repository secret** dans le dépôt Cloudix. Crée :
-
-| Secret | Valeur |
-|---|---|
-| `CLOUDIX_KEYSTORE_B64` | contenu base64 du fichier .p12 |
-| `CLOUDIX_STORE_PASSWORD` | mot de passe du magasin |
-| `CLOUDIX_KEY_PASSWORD` | mot de passe de la clé |
-| `CLOUDIX_KEY_ALIAS` | `cloudix` |
-
-Le workflow `.github/workflows/android.yml` reconstruit la clé **sur le runner uniquement**, signe `app-release.apk`, vérifie sa signature avec `apksigner` et publie l'artefact **Cloudix-release-signed**.
-
-**Installe uniquement l'artefact `Cloudix-release-signed` pour conserver la compatibilité des mises à jour.** Les builds `Cloudix-debug-apk` ne sont pas destinées à la distribution.
-
-## Validation
-
-Vérifie la signature de deux versions successives :
-
-```bash
-apksigner verify --print-certs --verbose app-release.apk
-```
-
-Le SHA-256 du certificat doit rester identique. Si tu perds le fichier .p12 ou le mot de passe, tu ne pourras plus publier de mises à jour compatibles avec la signature actuelle. La signature n'installe pas les mises à jour automatiquement : Android demande toujours à l'utilisateur de confirmer l'installation d'une APK téléchargée.
-
-## Sécurité
-
-- Ne partage jamais la clé privée ou les mots de passe dans une conversation, une issue GitHub ou le dépôt.
-- N'active pas la publication automatique des APK signées pour les pull requests de contributeurs externes.
-- Les clés de signature Android sont distinctes du certificat TLS utilisé pour appairer les téléphones.
+Pour comprendre la source de cette méthode : [workflow Routix](https://github.com/1337Detailing/Routix/blob/master/.github/workflows/build-debug-apk.yml).

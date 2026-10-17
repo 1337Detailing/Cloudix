@@ -60,8 +60,8 @@ object CloudixUpdater {
             if (conn.responseCode != 200)
                 throw IOException(
                     if (conn.responseCode == 404)
-                        "Canal de mise à jour non publié (404). Les APK GitHub Actions ne sont pas des Releases. " +
-                        "Le dépôt doit publier une APK signée avec une clé permanente. Consulte la section SIGNATURE du README."
+                        "La première APK de mise à jour n'est pas encore publiée sur GitHub (404). " +
+                        "Réessaie après la prochaine compilation Cloudix réussie."
                     else "Vérification GitHub impossible (HTTP ${conn.responseCode})."
                 )
             val length = conn.contentLengthLong

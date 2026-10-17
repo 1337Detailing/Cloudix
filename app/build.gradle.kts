@@ -3,13 +3,8 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
-// Supply the same private signing key through GitHub Actions secrets for every update.
-val cloudixKeyPath = System.getenv("CLOUDIX_KEYSTORE_PATH")
-val cloudixStorePassword = System.getenv("CLOUDIX_STORE_PASSWORD")
-val cloudixKeyAlias = System.getenv("CLOUDIX_KEY_ALIAS") ?: "cloudix"
-val cloudixKeyPassword = System.getenv("CLOUDIX_KEY_PASSWORD")
-val cloudixSigned = !cloudixKeyPath.isNullOrBlank() &&
-    !cloudixStorePassword.isNullOrBlank() && !cloudixKeyPassword.isNullOrBlank()
+// GitHub Actions restores the same debug.keystore through its persistent cache.
+val ciDebugKeystore = System.getenv("GITHUB_ACTIONS") == "true"
 android {
     namespace = "com.cloudix.app"
     compileSdk = 35
@@ -20,29 +15,25 @@ android {
         targetSdk = 35
         // Monotonically increasing versionCode prevents update downgrades.
         versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()?.let { 1000 + it } ?: 2
-        versionName = "0.5.2"
+        versionName = "0.5.3"
     }
     signingConfigs {
-        if (cloudixSigned) {
-            create("cloudixStable") {
-                storeFile = file(cloudixKeyPath!!)
-                storePassword = cloudixStorePassword
-                keyAlias = cloudixKeyAlias
-                keyPassword = cloudixKeyPassword
-                enableV1Signing = true
-                enableV2Signing = true
-                enableV3Signing = true
-                enableV4Signing = true
+        // Debug signing identity reused across CI builds, like Routix.
+        getByName("debug") {
+            if (ciDebugKeystore) {
+                storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
             }
         }
     }
     buildTypes {
         getByName("debug") {
-            if (cloudixSigned) signingConfig = signingConfigs.getByName("cloudixStable")
+            signingConfig = signingConfigs.getByName("debug")
         }
         release {
             isMinifyEnabled = false
-            if (cloudixSigned) signingConfig = signingConfigs.getByName("cloudixStable")
         }
     }
     compileOptions {

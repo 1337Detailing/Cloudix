@@ -133,3 +133,10 @@ Caution: arbitrary user-entered text/background colors can have low contrast. Us
 **Important :** Android n'autorise pas une APK signée avec une nouvelle clé à remplacer une APK déjà installée signée avec une autre clé. La version debug non signée avec la clé permanente peut nécessiter une migration unique (sauvegarde préalable de tes données Cloudix, désinstallation, installation de la version signée). Aucune modification de code ne peut contourner cette vérification système. Les versions suivantes ne nécessiteront plus cette migration tant que la clé et le nom de package restent identiques.
 
 **Sécurité :** ne mets jamais le fichier `.p12` ni les mots de passe dans le dépôt ou dans une conversation. Les fichiers de mise à jour sont validés par SHA-256 et par certificat Android avant installation. Le nom historique `debug-latest` désigne le canal de test, mais l'APK publiée est désormais une **Release signée**.
+
+
+## No-setup beta signing (Routix approach, 0.5.3+)
+
+Cloudix now mirrors Routix's cached stable Android debug signing key in GitHub Actions. A signing cache is bootstrapped on the first build, restored on subsequent builds, refreshed on twice-weekly scheduled builds, and APKs are published to GitHub Release `debug-latest` with an `update.json` SHA-256 manifest. No repository secrets or manual setup are required. CI checks the previous release's signing certificate to prevent incompatible update publication. Full details and cache limitations: [SIGNING.md](SIGNING.md).
+
+The earlier secret-based signing instructions and helper script are obsolete for the public debug channel. The first transition from an old ephemeral debug signature may still require uninstalling that old version once because Android enforces signer identity.

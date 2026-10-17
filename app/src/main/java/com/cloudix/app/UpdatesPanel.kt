@@ -19,7 +19,7 @@ fun UpdatesPanel() {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val scope = rememberCoroutineScope()
-    var state by remember { mutableStateOf("Les builds debug sont distribuées via GitHub Releases après signature permanente.") }
+    var state by remember { mutableStateOf("Les nouvelles builds GitHub sont publiées automatiquement. Aucun secret à configurer.") }
     var candidate by remember { mutableStateOf<CloudixUpdateInfo?>(null) }
     var downloaded by remember { mutableStateOf<File?>(null) }
     var checking by remember { mutableStateOf(false) }
@@ -62,14 +62,14 @@ fun UpdatesPanel() {
     }
     if (missingChannel) {
         OutlinedButton(onClick = {
-            uriHandler.openUri("https://github.com/1337Detailing/Cloudix/blob/main/SIGNING.md")
+            uriHandler.openUri("https://github.com/1337Detailing/Cloudix/actions/workflows/android.yml")
         }) {
             Icon(Icons.Rounded.Info, null)
             Spacer(Modifier.width(8.dp))
-            Text("Configurer la signature permanente")
+            Text("Ouvrir les builds GitHub")
         }
         Text(
-            "La compilation GitHub peut être verte sans APK publiée. Une fois les secrets de signature ajoutés, une nouvelle build publiera la Release et les mises à jour fonctionneront sans désinstaller l'application.",
+            "La release de mise à jour n'est pas encore disponible. GitHub la publie automatiquement après une compilation réussie. Si tu utilises une ancienne APK avec une autre signature, Android peut exiger une dernière réinstallation.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
