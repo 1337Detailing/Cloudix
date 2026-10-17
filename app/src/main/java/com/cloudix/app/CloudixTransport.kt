@@ -230,7 +230,12 @@ data class RemoteFile(
     val modified: Long = 0L,
     val mime: String = ""
 )
-class CloudixClient(val peer: Peer, private val context: Context? = null) {
+class CloudixClient(
+    val peer: Peer,
+    private val context: Context? = null,
+    private val connectTimeoutMs: Int = 12_000,
+    private val readTimeoutMs: Int = 60_000
+) {
     private fun preferIpv6(): Boolean {
         if (peer.globalIpv6 == null) return false
         if (context != null && CloudixSettings(context).preferDirectIpv6) return true
@@ -240,7 +245,9 @@ class CloudixClient(val peer: Peer, private val context: Context? = null) {
         return capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true
     }
 
-    private fun hostname(): String = peer.endpoints(preferIpv6()).first()
+    fun selectedAddress(): String = peer.endpoints(preferIpv6()).first()
+
+    private fun hostname(): String = selectedAddress()
 
     private fun describeFailure(e: Exception): Exception {
         if (preferIpv6() && peer.globalIpv6 != null &&
@@ -266,8 +273,8 @@ class CloudixClient(val peer: Peer, private val context: Context? = null) {
             sslSocketFactory = TlsIdentity.clientContext(peer.pin).socketFactory
             hostnameVerifier = javax.net.ssl.HostnameVerifier { _, _ -> true } // pin is verified by TrustManager
             requestMethod = method
-            connectTimeout = 12_000
-            readTimeout = 60_000
+            connectTimeout = connectTimeoutMs
+            readTimeout = readTimeoutMs
             setRequestProperty("Authorization", "Bearer ${peer.secret}")
             setRequestProperty("User-Agent", "Cloudix/0.1")
             useCaches = false
