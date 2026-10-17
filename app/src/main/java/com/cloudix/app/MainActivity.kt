@@ -389,12 +389,6 @@ fun CloudixApp(incoming: String) {
                                         Spacer(Modifier.width(8.dp)); Text("Ajouter un dossier à sauvegarder")
                                     }
                                     OutlinedButton(onClick = {
-                                        scope.launch(Dispatchers.IO) {
-                                            try {
-                                                val result = BackupWorker(context,
-                                                    androidx.work.WorkerParameters::class.java)
-                                            } catch (_: Exception) { }
-                                        }
                                         BackupScheduler.schedule(context)
                                         message = "Planification actualisée"
                                     }, modifier = Modifier.fillMaxWidth()) {
