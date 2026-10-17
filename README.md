@@ -1,18 +1,20 @@
 # Cloudix
 
-A private, native Android-to-Android file cloud. One APK, two roles: **Server** (Xiaomi) and **Client** (Vivo). Material 3 + dynamic colors; designed with inspiration from Clint Browser's flexible UI (no source or assets reused).
+A private, native Android-to-Android file cloud. One APK, two roles: **Server** (Xiaomi) and **Client** (Vivo). Material 3 + dynamic colors; designed with inspiration from Clint Gecko's flexible UI (no source or assets reused).
 
-## Features (0.1.0)
-- One-tap Server / Client onboarding, adjustable accent and appearance.
+## Features (0.2.0)
+- One-tap Server / Client onboarding, Material You wallpaper colors and 30 accents × 5 surface intensities, light/dark modes and optional animations.
 - Android Storage Access Framework (SAF): select a server root directory and grant only that directory access.
 - TLS server with a locally generated Android Keystore identity, 256-bit pairing secret and certificate pinning.
-- Transfer files, list folders, create directories, download, delete. Remote browsing requires explicit pairing.
+- Transfer files, browse, search, sort by modification date/size/name, rename and create directories, download, delete (with confirmation). Remote browsing requires explicit pairing.
 - QR pairing and pasteable pairing link; no other Android application is required.
-- Scheduled uploads from selected client directories (WorkManager, Wi-Fi-only switch, intervals >= 15 minutes, change-detection).
+- Scheduled and manual uploads from selected client directories (WorkManager, Wi-Fi-only switch, intervals >= 15 minutes, change-detection).
+- In-app TLS diagnostics on both phones, last server network error and active requests.
+- Optional server boot receiver (subject to HyperOS/Android background-start policies).
 - Foreground service with persistent notification. No unrestricted root access needed.
 
 ## Limitations
-- **Same-network LAN only in v0.1**. Do not port-forward to this server. Cellular/NAT traversal and end-to-end secure relay are *not yet implemented*.
+- **Same-network LAN only in v0.2**. Do not port-forward to this server. Cellular/NAT traversal and end-to-end secure relay are *not yet implemented*.
 - Android may restrict long-running services or periodic scheduling. Battery exemptions can improve reliability. No automatic start on reboot at this stage.
 - Directory-based storage is SAF-mediated; root access is deliberately not used.
 - **Not a full backup**: there is no deletion sync, versioning or guarantee against device/storage failures. Keep an independent backup.
@@ -35,12 +37,12 @@ The private server doesn't accept unpaired requests; the certificate SHA-256 fin
 JDK 17, Android SDK 35, Gradle 8.13. Run `gradle :app:assembleDebug`. GitHub Actions builds, lints, tests and attaches the APK as an artifact.
 
 ## Inspiration
-[Clint Browser](https://github.com/jhaiian/ClintBrowser) (Material 3, deep UI customization). Cloudix UI is original and independent. Clint's branding and assets are not used.
+[Clint Gecko](https://github.com/jhaiian/ClintGecko) (Material 3, deep UI customization). Cloudix UI is original and independent. Clint's branding and assets are not used.
 
 
 ## Stable signatures and in-place updates (0.2+)
 
-Android permits an in-place APK update only if the **applicationId remains unchanged**, the **signing certificate matches the installed app** and `versionCode` is higher. The original GitHub runner's ephemeral debug key cannot be recovered from the public repository, so anyone using the first v0.1 artifact must uninstall it **once** before installing the first stably signed release. Files stored in the selected external SAF folder are not deleted, but app pairing/settings may be reset.
+Android permits an in-place APK update only if the **applicationId remains unchanged**, the **signing certificate matches the installed app** and `versionCode` is higher. The original GitHub runner's ephemeral debug key cannot be recovered from the public repository, so anyone using the first v0.2 artifact must uninstall it **once** before installing the first stably signed release. Files stored in the selected external SAF folder are not deleted, but app pairing/settings may be reset.
 
 Generate and retain a single private PKCS#12 Android signing keystore, **never commit it**. Put these four GitHub Actions repository secrets into Settings → Secrets and variables → Actions:
 
@@ -52,3 +54,9 @@ Generate and retain a single private PKCS#12 Android signing keystore, **never c
 When all secrets exist, GitHub Actions signs both debug and release APKs **with the same permanent key**, verifies the release with `apksigner` and uploads `Cloudix-release-signed`. Subsequent release APKs can update in place. The CI run number produces an increasing versionCode. With missing secrets, CI still produces a **temporary debug** APK, but it will **not** support reliable updates between runs.
 
 **Important:** protect the keystore and password; a lost signing key prevents ordinary updates, and a leaked key allows impostor APKs. Store a second offline backup. Never upload your private keystore or base64 to the repository or an issue.
+
+## Debugging connection issues
+1. Both phones must be on the same local network (no guest Wi-Fi isolation).
+2. Xiaomi: start server, then tap **Tester** on the **Diagnostic réseau** row. Success proves Android TLS handshake works locally. On failure, inspect the last connection error shown below the card.
+3. Vivo: use the newest pairing QR, then tap **Tester**. If the local Xiaomi test succeeds but Vivo fails, inspect Wi-Fi IP, client AP isolation and firewall.
+4. Never publish a pairing QR/link; rotating the secret revokes all clients.
