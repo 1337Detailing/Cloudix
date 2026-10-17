@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -70,6 +71,7 @@ fun CloudixApp(incoming: String) {
     var newFolder by remember { mutableStateOf("") }
     var showFolderDialog by remember { mutableStateOf(false) }
     var pendingDownload by remember { mutableStateOf<RemoteFile?>(null) }
+    var pendingDelete by remember { mutableStateOf<RemoteFile?>(null) }
 
     fun report(error: Throwable) { message = error.message ?: "Une erreur s'est produite." }
     suspend fun refresh() {
@@ -213,7 +215,7 @@ fun CloudixApp(incoming: String) {
                                         TextButton(onClick = { chooseRoot.launch(null) }) { Text("Changer") }
                                     }
                                     if (CloudixStatus.running.value) {
-                                        val pairing = remember(CloudixStatus.running.value) {
+                                        val pairing = remember(CloudixStatus.running.value, revision) {
                                             try { settings.serverLink() } catch (_: Exception) { "" }
                                         }
                                         if (pairing.isNotBlank()) {
@@ -325,16 +327,9 @@ fun CloudixApp(incoming: String) {
                                                     else { pendingDownload = file; createDownload.launch(file.name) }
                                                 }) { Icon(if (file.directory) Icons.Rounded.ChevronRight
                                                     else Icons.Rounded.Download, "Ouvrir") }
-                                                IconButton(onClick = {
-                                                    scope.launch {
-                                                        try {
-                                                            withContext(Dispatchers.IO) {
-                                                                CloudixClient(Peer.parse(peerLink)).delete(file.path)
-                                                            }
-                                                            refresh()
-                                                        } catch (e: Exception) { report(e) }
-                                                    }
-                                                }) { Icon(Icons.Rounded.DeleteOutline, "Supprimer") }
+                                                IconButton(onClick = { pendingDelete = file }) {
+                                                    Icon(Icons.Rounded.DeleteOutline, "Supprimer")
+                                                }
                                             }
                                         }
                                     }
@@ -437,6 +432,27 @@ fun CloudixApp(incoming: String) {
             AlertDialog(onDismissRequest = { message = "" }, confirmButton = {
                 TextButton(onClick = { message = "" }) { Text("OK") }
             }, title = { Text("Cloudix") }, text = { Text(message) })
+        }
+        pendingDelete?.let { file ->
+            AlertDialog(
+                onDismissRequest = { pendingDelete = null },
+                title = { Text("Supprimer ${file.name} ?") },
+                text = { Text("Cette suppression est définitive sur le serveur.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        pendingDelete = null
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) {
+                                    CloudixClient(Peer.parse(peerLink)).delete(file.path)
+                                }
+                                refresh()
+                            } catch (e: Exception) { report(e) }
+                        }
+                    }) { Text("Supprimer") }
+                },
+                dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("Annuler") } }
+            )
         }
         if (showFolderDialog) {
             AlertDialog(onDismissRequest = { showFolderDialog = false },
