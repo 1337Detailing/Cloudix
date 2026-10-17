@@ -17,6 +17,10 @@ import java.util.concurrent.TimeUnit
 object BackupScheduler {
     fun schedule(context: Context) {
         val settings = CloudixSettings(context)
+        if (settings.backupFolders.isEmpty() || settings.peer.isBlank()) {
+            cancel(context)
+            return
+        }
         val constraints = Constraints.Builder().setRequiredNetworkType(
             if (settings.wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED
         ).build()
@@ -31,7 +35,8 @@ object BackupScheduler {
         val constraints = Constraints.Builder().setRequiredNetworkType(
             if (settings.wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED
         ).build()
-        WorkManager.getInstance(context).enqueue(
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "cloudix_manual_backup", androidx.work.ExistingWorkPolicy.KEEP,
             OneTimeWorkRequestBuilder<BackupWorker>().setConstraints(constraints).build()
         )
     }
@@ -49,7 +54,9 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             val device = safeName(Build.MODEL.ifBlank { "Android" })
             ensure(client, "", "Backups")
             ensure(client, "Backups", device)
-            var counter = 0
+            var scanned = 0
+            var uploaded = 0
+            var inaccessibleDepth = false
             for (str in settings.backupFolders) {
                 if (isStopped) return Result.retry()
                 val tree = DocumentFile.fromTreeUri(applicationContext, Uri.parse(str)) ?: continue
@@ -59,13 +66,16 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                 val dest = "Backups/$device/$folder"
                 val pending = ArrayDeque<Pair<DocumentFile, Pair<String, Int>>>()
                 pending.addLast(tree to (dest to 0))
-                while (pending.isNotEmpty() && counter < 4000) {
+                while (pending.isNotEmpty()) {
                     if (isStopped) return Result.retry()
                     val (dir, node) = pending.removeFirst()
                     val (remoteDir, depth) = node
-                    if (depth >= 16) continue
+                    if (depth >= 28) {
+                        inaccessibleDepth = true
+                        continue
+                    }
                     for (item in dir.listFiles()) {
-                        if (counter++ >= 4000) break
+                        scanned++
                         val name = safeName(item.name ?: continue)
                         if (item.isDirectory) {
                             ensure(client, remoteDir, name)
@@ -76,17 +86,31 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                             val id = item.uri.toString()
                             val stamp = "$size:${item.lastModified()}"
                             if (state.optString(id) == stamp) continue
+                            // A batch is limited by UPLOADS, not items scanned.
+                            // Persist every completed file and retry for the next batch,
+                            // so folders with >4000 existing files are never silently skipped.
+                            if (uploaded >= 4000) {
+                                settings.lastBackupItems = uploaded
+                                return Result.retry()
+                            }
                             val input = applicationContext.contentResolver.openInputStream(item.uri) ?: continue
                             client.upload(remoteDir, name, size, input)
+                            uploaded++
                             state.put(id, stamp)
                             settings.saveBackupState(state)
                         }
                     }
                 }
             }
-            settings.lastBackupAt = System.currentTimeMillis()
-            settings.lastBackupItems = counter
-            Result.success()
+            settings.lastBackupItems = uploaded
+            if (inaccessibleDepth) {
+                android.util.Log.w("CloudixBackup",
+                    "Some directories exceed the supported remote depth of 32 segments")
+                Result.failure()
+            } else {
+                settings.lastBackupAt = System.currentTimeMillis()
+                Result.success()
+            }
         } catch (_: Exception) {
             Result.retry()
         }

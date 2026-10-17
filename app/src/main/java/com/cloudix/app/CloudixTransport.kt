@@ -259,7 +259,16 @@ class CloudixClient(
     }
 
     // The VPN route is stable across Wi-Fi/5G and avoids a blocked home IPv6 firewall.
-    fun selectedAddress(): String = peer.tailscale ?: peer.endpoints(preferIpv6()).first()
+    fun selectedAddress(): String {
+        if (peer.tailscale == null) return peer.endpoints(preferIpv6()).first()
+        val cm = context?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        val capabilities = cm?.getNetworkCapabilities(cm.activeNetwork)
+        val vpnActive = capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+        val wifiActive = capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+        // With VPN active, prefer encrypted tailnet. Without VPN on a local Wi-Fi,
+        // the QR's LAN address still works; mobile requires a routed endpoint.
+        return if (vpnActive || !wifiActive) peer.tailscale else peer.host
+    }
 
     private fun hostname(): String = selectedAddress()
 
@@ -346,7 +355,14 @@ class CloudixClient(
         val conn = connection("/api/file?path=${Uri.encode(path)}")
         try {
             if (conn.responseCode != 200) throw CloudixNetworkFailure.http(conn.responseCode, conn.errorStream)
-            conn.inputStream.use { input -> sink.use { output -> input.copyTo(output, 65536) } }
+            // Never report a truncated response as a successful downloaded file.
+            val expectedLength = conn.contentLengthLong
+            conn.inputStream.use { input ->
+                sink.use { output ->
+                    if (expectedLength >= 0) copyExactly(input, output, expectedLength)
+                    else input.copyTo(output, 65536)
+                }
+            }
         } catch (e: Exception) { throw describeFailure(e) }
         finally { conn.disconnect() }
     }

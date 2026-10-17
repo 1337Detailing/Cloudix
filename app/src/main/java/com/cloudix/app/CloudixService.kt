@@ -133,7 +133,7 @@ class CloudixService : Service() {
     private fun validName(name: String): Boolean =
         name.isNotBlank() && name != "." && name != ".." && name.length <= 180 &&
             !name.contains('/') && !name.contains('\\') &&
-            !name.contains('\u0000') && !name.contains('%') &&
+            !name.contains('\u0000') &&
             !name.any { it.code < 32 }
     private fun locate(path: String): DocumentFile {
         var item = root()

@@ -169,7 +169,14 @@ fun CloudixApp(incoming: String) {
                     CloudixClient(Peer.parse(peerLink), context).download(file.path, output)
                 }
                 message = "Fichier téléchargé : ${file.name}"
-            } catch (e: Exception) { report(e) }
+            } catch (e: Exception) {
+                // CreateDocument allocated a brand-new URI. Remove the partial file
+                // on transfer failure instead of leaving a corrupted "successful" download.
+                withContext(Dispatchers.IO) {
+                    runCatching { context.contentResolver.delete(uri, null, null) }
+                }
+                report(e)
+            }
             finally { loading = false; pendingDownload = null }
         }
     }
