@@ -4,6 +4,11 @@ import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.draw.scale
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -242,9 +247,18 @@ fun WelcomeScreen(onServer: () -> Unit, onClient: () -> Unit) {
 
 @Composable
 private fun RoleCard(title: String, description: String, icon: ImageVector, action: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) .965f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ), label = "cloudix-card-spring")
     ElevatedCard(onClick = action, shape = RoundedCornerShape(28.dp),
+        interactionSource = interactionSource,
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
-        modifier = Modifier.fillMaxWidth()) {
+        modifier = Modifier.fillMaxWidth().scale(scale)) {
         Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.primaryContainer) {
