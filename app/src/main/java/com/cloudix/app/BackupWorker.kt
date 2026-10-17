@@ -5,6 +5,9 @@ import android.net.Uri
 import android.os.Build
 import androidx.documentfile.provider.DocumentFile
 import androidx.work.Constraints
+import androidx.work.Data
+import androidx.work.OutOfQuotaPolicy
+import androidx.work.workDataOf
 import androidx.work.CoroutineWorker
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.ExistingWorkPolicy
@@ -14,6 +17,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
 import androidx.work.WorkManager
 import java.util.concurrent.TimeUnit
+import java.util.UUID
 
 object BackupScheduler {
     fun schedule(context: Context) {
@@ -31,15 +35,22 @@ object BackupScheduler {
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             "cloudix_backup", ExistingPeriodicWorkPolicy.UPDATE, request)
     }
-    fun runNow(context: Context) {
+    fun runNow(context: Context): UUID {
         val settings = CloudixSettings(context)
         val constraints = Constraints.Builder().setRequiredNetworkType(
             if (settings.wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED
         ).build()
+        // Expedited work starts as soon as Android permits it; it does not wait
+        // for the next periodic backup interval. Quota fallback remains safe.
+        val request = OneTimeWorkRequestBuilder<BackupWorker>()
+            .setConstraints(constraints)
+            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            .build()
+        settings.lastManualBackupId = request.id.toString()
         WorkManager.getInstance(context).enqueueUniqueWork(
-            "cloudix_manual_backup", ExistingWorkPolicy.REPLACE,
-            OneTimeWorkRequestBuilder<BackupWorker>().setConstraints(constraints).build()
+            "cloudix_manual_backup", ExistingWorkPolicy.REPLACE, request
         )
+        return request.id
     }
     fun cancel(context: Context) =
         WorkManager.getInstance(context).cancelUniqueWork("cloudix_backup")
@@ -48,10 +59,20 @@ object BackupScheduler {
 class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val settings = CloudixSettings(applicationContext)
-        if (settings.peer.isBlank() || settings.backupFolders.isEmpty()) return Result.success()
+        if (settings.peer.isBlank() || settings.backupFolders.isEmpty()) {
+            val reason = "Aucun serveur appairé ou aucun dossier de sauvegarde sélectionné."
+            settings.lastBackupError = reason
+            return Result.failure(workDataOf("error" to reason))
+        }
         return try {
             settings.lastBackupError = ""
+            settings.lastBackupItems = 0
+            setProgress(workDataOf("phase" to "Connexion au Xiaomi...", "uploaded" to 0))
             val client = CloudixClient(Peer.parse(settings.peer), applicationContext)
+            // Verify the actual route from inside the Worker, not only the UI.
+            // Tailscale is available to workers through Android's VPN network stack.
+            client.ping()
+            setProgress(workDataOf("phase" to "Analyse des dossiers...", "uploaded" to 0))
             val state = settings.backupState()
             val device = safeName(Build.MODEL.ifBlank { "Android" })
             ensure(client, "", "Backups")
@@ -59,10 +80,15 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             var uploaded = 0
             var inaccessibleDepth = false
             var skippedLargeOrUnknown = 0
+            var inaccessibleFolderCount = 0
+            var unreadableFiles = 0
             for (str in settings.backupFolders) {
                 if (isStopped) return Result.retry()
-                val tree = DocumentFile.fromTreeUri(applicationContext, Uri.parse(str)) ?: continue
-                if (!tree.isDirectory) continue
+                val tree = DocumentFile.fromTreeUri(applicationContext, Uri.parse(str))
+                if (tree == null || !tree.isDirectory) {
+                    inaccessibleFolderCount++
+                    continue
+                }
                 val folder = safeName(tree.name ?: "Dossier")
                 ensure(client, "Backups/$device", folder)
                 val dest = "Backups/$device/$folder"
@@ -99,32 +125,49 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                                     "Sauvegarde partielle : $uploaded fichiers transférés. Reprise prévue automatiquement."
                                 return Result.retry()
                             }
-                            val input = applicationContext.contentResolver.openInputStream(item.uri) ?: continue
+                            val input = applicationContext.contentResolver.openInputStream(item.uri)
+                            if (input == null) {
+                                unreadableFiles++
+                                continue
+                            }
+                            setProgress(workDataOf("phase" to "Transfert : ${name.take(60)}",
+                                "uploaded" to uploaded))
                             client.upload(remoteDir, name, size, input)
                             uploaded++
+                            settings.lastBackupItems = uploaded
+                            // Store state after confirmed HTTP success, never before.
                             state.put(id, stamp)
                             settings.saveBackupState(state)
+                            setProgress(workDataOf("phase" to "Sauvegarde en cours...",
+                                "uploaded" to uploaded))
                         }
                     }
                 }
             }
             settings.lastBackupItems = uploaded
-            if (skippedLargeOrUnknown > 0 || inaccessibleDepth) {
+            if (skippedLargeOrUnknown > 0 || inaccessibleDepth ||
+                inaccessibleFolderCount > 0 || unreadableFiles > 0) {
                 settings.lastBackupError =
-                    "Sauvegarde incomplète : $skippedLargeOrUnknown fichiers trop volumineux ou de taille inconnue" +
-                    (if (inaccessibleDepth) ", et certains sous-dossiers sont trop profonds." else ".")
+                    "Sauvegarde incomplète : $skippedLargeOrUnknown fichiers trop volumineux/inconnus, " +
+                    "$unreadableFiles fichiers illisibles, $inaccessibleFolderCount dossiers non autorisés" +
+                    (if (inaccessibleDepth) ", arborescence trop profonde." else ".")
                 android.util.Log.w("CloudixBackup",
                     settings.lastBackupError)
-                Result.failure()
+                Result.failure(workDataOf("error" to settings.lastBackupError,
+                    "uploaded" to uploaded))
             } else {
                 settings.lastBackupAt = System.currentTimeMillis()
                 settings.lastBackupError = ""
-                Result.success()
+                setProgress(workDataOf("phase" to "Terminé", "uploaded" to uploaded))
+                Result.success(workDataOf("uploaded" to uploaded))
             }
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            settings.lastBackupError = "Échec temporaire de sauvegarde : ${e.message ?: "connexion indisponible"}"
-            Result.retry()
+            val detail = e.message?.take(210) ?: "connexion indisponible"
+            settings.lastBackupError = "Échec de sauvegarde : $detail"
+            if (runAttemptCount >= 5) {
+                Result.failure(workDataOf("error" to settings.lastBackupError))
+            } else Result.retry()
         }
     }
     private fun safeName(name: String): String = CloudixBackupNames.safeName(name)

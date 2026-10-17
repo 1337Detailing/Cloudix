@@ -156,6 +156,9 @@ class CloudixSettings(private val context: Context) {
             observedWifiOnly = value
             prefs.edit().putBoolean("wifi_only", value).apply()
         }
+    var lastManualBackupId: String
+        get() = prefs.getString("backup_last_manual_id", "") ?: ""
+        set(value) = prefs.edit().putString("backup_last_manual_id", value).apply()
     var lastBackupError: String
         get() = prefs.getString("backup_last_error", "") ?: ""
         set(value) = prefs.edit().putString("backup_last_error", value.take(300)).apply()
