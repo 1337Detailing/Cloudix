@@ -8,6 +8,14 @@ Les anciennes APK `Cloudix-debug-apk` générées par GitHub Actions **sans clé
 
 Avant la première réinstallation, exporte/sauvegarde les fichiers importants et note tes dossiers sélectionnés. Ne supprime pas l'application serveur sans t'assurer que tes données sont ailleurs.
 
+## Installation guidée (recommandée)
+
+Sur un PC avec **JDK** et **GitHub CLI** connecté à ton compte (`gh auth login`), tu peux exécuter le script `scripts/setup-signing.sh` depuis le dépôt Cloudix. Il crée la clé dans `~/cloudix-signing/cloudix-release.p12`, puis configure automatiquement les quatre secrets du dépôt GitHub via une connexion authentifiée. La clé n'est jamais commitée dans le dépôt.
+
+Après configuration, lance **Actions → Android APK → Run workflow**. Une nouvelle compilation publiera la Release `debug-latest`, contenant l'APK signée et le manifeste de mise à jour. Conserve une copie privée du fichier `.p12` et son mot de passe : sans eux, les prochaines APK ne pourront plus être mises à jour par-dessus.
+
+**Attention :** une build GitHub verte ne prouve pas que la Release est publiée. La publication reste désactivée tant que les secrets ne sont pas configurés.
+
 ## Créer une clé privée stable (à conserver)
 
 Sur ton PC, avec JDK 17 ou supérieur :
