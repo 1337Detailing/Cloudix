@@ -3,17 +3,16 @@ package com.cloudix.app
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import java.io.IOException
-import java.net.InetSocketAddress
-import java.net.Socket
+import java.net.ConnectException
+import java.net.NoRouteToHostException
+import java.net.SocketTimeoutException
 import javax.net.ssl.SSLHandshakeException
-import kotlin.system.measureTimeMillis
 
 /**
  * Synchronous, bounded diagnostic. Invoke from Dispatchers.IO.
  *
  * A saved QR and a public IPv6 address alone do not prove reachability:
- * first test the TCP port, then perform a fully authenticated TLS ping.
+ * verify reachability, TLS certificate pinning and authentication in ONE request.
  */
 data class ConnectionDiagnostic(
     val reachable: Boolean,
@@ -39,30 +38,36 @@ object CloudixConnectivity {
                 path = label)
         }
         val started = System.nanoTime()
-        try {
-            Socket().use { socket ->
-                socket.soTimeout = 4_500
-                socket.connect(InetSocketAddress(address, peer.port), 4_500)
-            }
-        } catch (e: Exception) {
-            return ConnectionDiagnostic(false, "Connexion réseau bloquée",
-                if (ipv6) {
-                    "L'adresse IPv6 existe, mais le port ${peer.port} ne répond pas. Le pare-feu de la box ou un filtrage réseau est probable. Aucun réglage de Cloudix ne peut ouvrir ce port sans accès à la box."
-                } else {
-                    "Impossible de joindre le Xiaomi en Wi-Fi. Vérifie que le serveur est démarré et que les deux téléphones sont sur le même réseau."
-                }, elapsedMs(started), label)
-        }
         return try {
             client.ping()
             ConnectionDiagnostic(true, "Xiaomi joignable",
                 "Connexion chiffrée TLS et authentification Cloudix vérifiées.",
                 elapsedMs(started), label)
         } catch (e: Exception) {
-            ConnectionDiagnostic(false, "Serveur atteint, réponse refusée",
-                when (e) {
-                    is SSLHandshakeException -> "Le port répond, mais la connexion TLS échoue. Actualise le QR et réappaire le Vivo."
-                    else -> "Le port répond, mais le test TLS/authentification n'a pas réussi : ${e.message?.take(190) ?: "aucune réponse"}."
-                }, elapsedMs(started), label)
+            // CloudixClient wraps low-level networking exceptions to provide localized messages.
+            // Unwrap them to distinguish a filtered network from authentication/TLS errors.
+            var cause: Throwable = e
+            repeat(6) {
+                if (cause.cause != null) cause = cause.cause!!
+            }
+            val unreachable = cause is ConnectException || cause is SocketTimeoutException ||
+                cause is NoRouteToHostException
+            val invalidTls = cause is SSLHandshakeException
+            val heading = when {
+                unreachable -> "Connexion réseau bloquée"
+                invalidTls -> "Erreur de connexion sécurisée"
+                else -> "Le Xiaomi n'a pas répondu"
+            }
+            val explanation = when {
+                unreachable && ipv6 ->
+                    "Le Xiaomi a une IPv6 publique, mais le port ${peer.port} ne répond pas depuis ce réseau. Le pare-feu de la box ou un filtrage de l'opérateur peut bloquer la connexion entrante. Sans accès au routeur ni relais, Cloudix ne peut pas contourner ce blocage."
+                unreachable ->
+                    "Le Xiaomi est inaccessible sur le Wi-Fi. Vérifie que son serveur Cloudix est démarré et que les appareils partagent le même réseau."
+                invalidTls ->
+                    "Le certificat TLS ne correspond pas ou la négociation a échoué. Actualise le QR sur le Xiaomi et réappaire le Vivo."
+                else -> e.message ?: "Erreur réseau inconnue. Vérifie le serveur et l'appairage."
+            }
+            ConnectionDiagnostic(false, heading, explanation, elapsedMs(started), label)
         }
     }
 
