@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -336,12 +337,18 @@ private fun AppearanceChoiceDialog(
     onDismiss: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
+    // Long accent lists open on the current selection, not at the first preset.
+    val selectedIndex = items.indexOfFirst { it.id == chosen }.coerceAtLeast(0)
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = selectedIndex)
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title, fontWeight = FontWeight.Bold) },
         text = {
-            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 490.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 490.dp),
+                state = listState,
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 items(items, key = { it.id }) { option ->
                     val selected = chosen == option.id
                     val border = if (selected)

@@ -78,7 +78,7 @@ class CloudixSettings(private val context: Context) {
         get() = appearance.theme
         set(v) {
             require(v in listOf("system", "light", "dark"))
-            val nextStyle = if (v == "light" && appearance.surfaceStyle.startsWith("amoled"))
+            val nextStyle = if (v != "dark" && appearance.surfaceStyle.startsWith("amoled"))
                 "soft" else appearance.surfaceStyle
             updateAppearance(appearance.copy(theme = v, surfaceStyle = nextStyle))
         }

@@ -48,6 +48,47 @@ class AppearanceLiveTest {
         composeRule.onNodeWithTag("live-color").assertTextEquals(mustard)
     }
 
+    @Test fun customBackgroundRecomposesImmediately() {
+        composeRule.setContent {
+            CloudixTheme(settings) {
+                Text(
+                    text = MaterialTheme.colorScheme.background.toArgb().toString(),
+                    modifier = Modifier.testTag("live-custom-background")
+                )
+            }
+        }
+        composeRule.runOnUiThread {
+            settings.setColorOverride(CloudixColorRole.BACKGROUND, "#182B38")
+        }
+        composeRule.onNodeWithTag("live-custom-background").assertTextEquals(
+            hexColor("#182B38").toArgb().toString()
+        )
+    }
+
+    @Test fun switchingFromAmoledBackToSystemRestoresNormalSurfaces() {
+        composeRule.runOnUiThread { settings.surfaceStyle = "amoled_plain" }
+        composeRule.setContent {
+            CloudixTheme(settings) {
+                Text(
+                    text = MaterialTheme.colorScheme.background.toArgb().toString(),
+                    modifier = Modifier.testTag("live-amoled-system")
+                )
+            }
+        }
+        composeRule.onNodeWithTag("live-amoled-system").assertTextEquals(
+            androidx.compose.ui.graphics.Color.Black.toArgb().toString()
+        )
+        composeRule.runOnUiThread { settings.theme = "system" }
+        composeRule.waitForIdle()
+        org.junit.Assert.assertEquals("soft", settings.surfaceStyle)
+        // Device theme can be light or dark; both must leave the forced AMOLED black.
+        org.junit.Assert.assertNotEquals(
+            androidx.compose.ui.graphics.Color.Black.toArgb().toString(),
+            composeRule.onNodeWithTag("live-amoled-system").fetchSemanticsNode()
+                .config[androidx.compose.ui.semantics.SemanticsProperties.Text].first().text
+        )
+    }
+
     @Test fun amoledChangesBackgroundWithoutRestart() {
         composeRule.setContent {
             CloudixTheme(settings) {

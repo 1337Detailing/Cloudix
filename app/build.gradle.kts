@@ -20,7 +20,7 @@ android {
         targetSdk = 35
         // Monotonically increasing versionCode prevents update downgrades.
         versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()?.let { 1000 + it } ?: 2
-        versionName = "0.5.0"
+        versionName = "0.5.1"
     }
     signingConfigs {
         if (cloudixSigned) {
