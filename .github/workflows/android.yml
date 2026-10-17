@@ -70,7 +70,7 @@ jobs:
           cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/cloudix-debug.apk"
           DIGEST="$(sha256sum "$RUNNER_TEMP/cloudix-debug.apk" | cut -d' ' -f1)"
           VERSION_CODE="$((1000 + GITHUB_RUN_NUMBER))"
-          printf '{"versionCode":%d,"sha256":"%s","url":"https://github.com/1337Detailing/Cloudix/releases/download/debug-latest/cloudix-debug.apk","title":"Build debug #%s"}\\n' "$VERSION_CODE" "$DIGEST" "$GITHUB_RUN_NUMBER" > "$RUNNER_TEMP/update.json"
+          printf '{"versionCode":%d,"sha256":"%s","url":"https://github.com/1337Detailing/Cloudix/releases/download/debug-latest/cloudix-debug.apk","title":"Build debug #%s"}' "$VERSION_CODE" "$DIGEST" "$GITHUB_RUN_NUMBER" > "$RUNNER_TEMP/update.json"
           if gh release view debug-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload debug-latest "$RUNNER_TEMP/cloudix-debug.apk" "$RUNNER_TEMP/update.json" --clobber --repo "$GITHUB_REPOSITORY"
           else
