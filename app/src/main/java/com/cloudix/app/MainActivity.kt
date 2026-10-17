@@ -45,6 +45,7 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
@@ -83,6 +84,8 @@ fun CloudixApp(incoming: String) {
     var pendingRename by remember { mutableStateOf<RemoteFile?>(null) }
     var renameName by remember { mutableStateOf("") }
     var searchQuery by remember { mutableStateOf("") }
+    var backupError by remember { mutableStateOf(settings.lastBackupError) }
+    var backupLastAt by remember { mutableLongStateOf(settings.lastBackupAt) }
     var diagnostic by remember { mutableStateOf("") }
     var connectionVerified by remember { mutableStateOf(false) }
     var connectionChecking by remember { mutableStateOf(false) }
@@ -192,6 +195,17 @@ fun CloudixApp(incoming: String) {
     }
     LaunchedEffect(role, peerLink, currentPath) {
         if (role == "client" && peerLink.isNotEmpty()) refresh()
+    }
+    LaunchedEffect(role, page) {
+        if (role == "client" && page == 2) {
+            // WorkManager runs in a different instance of CloudixSettings.
+            // Refresh its persisted result while the Backup page is visible.
+            while (true) {
+                backupError = settings.lastBackupError
+                backupLastAt = settings.lastBackupAt
+                delay(3_000)
+            }
+        }
     }
     LaunchedEffect(peerLink) {
         connectionVerified = false
@@ -650,15 +664,15 @@ fun CloudixApp(incoming: String) {
                                         Spacer(Modifier.width(8.dp))
                                         Text("Sauvegarder maintenant")
                                     }
-                                    if (settings.lastBackupError.isNotBlank()) {
-                                        Text(settings.lastBackupError,
+                                    if (backupError.isNotBlank()) {
+                                        Text(backupError,
                                             color = MaterialTheme.colorScheme.error,
                                             style = MaterialTheme.typography.bodyMedium)
                                     }
-                                    if (settings.lastBackupAt > 0L) {
+                                    if (backupLastAt > 0L) {
                                         SettingItem(Icons.Rounded.History, "Dernier passage",
                                             java.text.DateFormat.getDateTimeInstance().format(
-                                                java.util.Date(settings.lastBackupAt)))
+                                                java.util.Date(backupLastAt)))
                                     }
                                     Text("Si le Xiaomi n'est pas accessible, WorkManager réessaiera plus tard. Les fichiers supprimés ne sont pas effacés du serveur.",
                                         style = MaterialTheme.typography.bodySmall,
