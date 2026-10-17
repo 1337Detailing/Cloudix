@@ -95,3 +95,18 @@ Tailscale's free Personal plan covers a small private network. Tailscale's contr
 **Safety:** Treat Cloudix pairing links as passwords; only share them privately. No port forwarding and no public IP exposure are required. Do not enable Tailscale Funnel (which exposes services publicly). The `100.64.0.0/10` range is shared address space; an address in this range is **not proof** that the remote device is authenticated—Cloudix continues verifying its pinned server certificate and pairing secret.
 
 Official docs: https://tailscale.com/docs/install/android and https://tailscale.com/kb/1452/connect-to-devices
+
+## Cloudix 0.5 — Live Look & Feel personalization
+
+- Appearance settings use an immutable Compose-observable `AppearanceSnapshot`. Changes persist and *immediately recompose all visible screens*, without restarting Cloudix.
+- Material You wallpaper colors on Android 12+, with a graceful fallback on Android devices that do not provide OEM palette resources.
+- **3 app themes:** System, Dark and Light.
+- **4 surface modes:** Soft Tint, Strong Tint, AMOLED (true black), AMOLED No Tint (pure black, accent controls only). Choosing AMOLED forces dark mode, choosing Light exits AMOLED.
+- **36 named accent palettes**, including gold/mustard, red, crimson, ruby, teal and lavender, with icon previews and highlighted selected values.
+- **7 individually editable HEX roles:** background, surfaces/cards, text, accent, selection, outlines and scrollbars. Each color can be reset separately and all overrides can be cleared together.
+- Animated theme transitions, custom scrollbar thumb, real-time preview, descriptions and visually rich modal selection cards.
+- Previously saved theme/accent choices are retained.
+
+Manual testing: Open **Thèmes → Couleur d'accent → Moutarde**; verify the top/bottom navigation and home screen change immediately. Select **AMOLED sans teinte** and navigate without restarting. Enter a custom background HEX and confirm an immediate visual change. Restore system wallpaper via Material You. Test switching colors with animations on and off, and restart to confirm persistence.
+
+Caution: arbitrary user-entered text/background colors can have low contrast. Use reset controls if legibility suffers.

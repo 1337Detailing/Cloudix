@@ -690,7 +690,7 @@ fun CloudixApp(incoming: String) {
                                     settings.role = ""; role = ""; page = 0
                                 }) { Text("Changer le rôle de ce téléphone") }
                                 Spacer(Modifier.height(16.dp))
-                                Text("Cloudix 0.3.0 · IPv6 directe · Signature mise à jour selon l'APK",
+                                Text("Cloudix ${BuildConfig.VERSION_NAME} · VPN Tailscale · Signature Android",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
