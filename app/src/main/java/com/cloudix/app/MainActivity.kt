@@ -650,6 +650,11 @@ fun CloudixApp(incoming: String) {
                                         Spacer(Modifier.width(8.dp))
                                         Text("Sauvegarder maintenant")
                                     }
+                                    if (settings.lastBackupError.isNotBlank()) {
+                                        Text(settings.lastBackupError,
+                                            color = MaterialTheme.colorScheme.error,
+                                            style = MaterialTheme.typography.bodyMedium)
+                                    }
                                     if (settings.lastBackupAt > 0L) {
                                         SettingItem(Icons.Rounded.History, "Dernier passage",
                                             java.text.DateFormat.getDateTimeInstance().format(

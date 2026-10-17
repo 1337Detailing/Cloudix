@@ -137,6 +137,9 @@ class CloudixSettings(private val context: Context) {
     var wifiOnly: Boolean
         get() = prefs.getBoolean("wifi_only", true)
         set(v) = prefs.edit().putBoolean("wifi_only", v).apply()
+    var lastBackupError: String
+        get() = prefs.getString("backup_last_error", "") ?: ""
+        set(value) = prefs.edit().putString("backup_last_error", value.take(300)).apply()
     var lastBackupAt: Long
         get() = prefs.getLong("last_backup_at", 0)
         set(v) = prefs.edit().putLong("last_backup_at", v).apply()

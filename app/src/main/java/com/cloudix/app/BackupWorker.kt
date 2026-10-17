@@ -49,12 +49,12 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         val settings = CloudixSettings(applicationContext)
         if (settings.peer.isBlank() || settings.backupFolders.isEmpty()) return Result.success()
         return try {
+            settings.lastBackupError = ""
             val client = CloudixClient(Peer.parse(settings.peer), applicationContext)
             val state = settings.backupState()
             val device = safeName(Build.MODEL.ifBlank { "Android" })
             ensure(client, "", "Backups")
             ensure(client, "Backups", device)
-            var scanned = 0
             var uploaded = 0
             var inaccessibleDepth = false
             for (str in settings.backupFolders) {
@@ -75,7 +75,6 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                         continue
                     }
                     for (item in dir.listFiles()) {
-                        scanned++
                         val name = safeName(item.name ?: continue)
                         if (item.isDirectory) {
                             ensure(client, remoteDir, name)
@@ -91,6 +90,8 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                             // so folders with >4000 existing files are never silently skipped.
                             if (uploaded >= 4000) {
                                 settings.lastBackupItems = uploaded
+                                settings.lastBackupError =
+                                    "Sauvegarde partielle : $uploaded fichiers transférés. Reprise prévue automatiquement."
                                 return Result.retry()
                             }
                             val input = applicationContext.contentResolver.openInputStream(item.uri) ?: continue
@@ -104,14 +105,19 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             }
             settings.lastBackupItems = uploaded
             if (inaccessibleDepth) {
+                settings.lastBackupError =
+                    "Certains dossiers dépassent la profondeur maximale autorisée (28 sous-dossiers)."
                 android.util.Log.w("CloudixBackup",
-                    "Some directories exceed the supported remote depth of 32 segments")
+                    settings.lastBackupError)
                 Result.failure()
             } else {
                 settings.lastBackupAt = System.currentTimeMillis()
+                settings.lastBackupError = ""
                 Result.success()
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            settings.lastBackupError = "Échec temporaire de sauvegarde : ${e.message ?: "connexion indisponible"}"
             Result.retry()
         }
     }
