@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -410,6 +411,12 @@ private fun resolvedColor(role: CloudixColorRole, colors: ColorScheme): Color =
 private fun colorCode(value: Color): String =
     "#%06X".format(value.toArgb() and 0xFFFFFF)
 
+private fun contrastRatio(a: Color, b: Color): Float {
+    val x = a.luminance()
+    val y = b.luminance()
+    return (maxOf(x, y) + .05f) / (minOf(x, y) + .05f)
+}
+
 @Composable
 private fun ColorEditorDialog(
     role: CloudixColorRole,
@@ -458,8 +465,8 @@ private fun ColorEditorDialog(
                         }
                 }
                 if (role == CloudixColorRole.TEXT && parsed != null &&
-                    kotlin.math.abs(preview.toArgb() - background.toArgb()) < 512) {
-                    Text("Attention : assure-toi que le texte reste lisible sur le fond choisi.",
+                    contrastRatio(preview, background) < 4.5f) {
+                    Text("Contraste inférieur à 4,5:1 : ce texte risque d'être difficile à lire.",
                         color = colors.error, style = MaterialTheme.typography.bodySmall)
                 }
             }
