@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -44,6 +45,7 @@ class MainActivity : ComponentActivity() {
     private var incoming by mutableStateOf("")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         incoming = intent?.dataString ?: ""
         setContent { CloudixApp(incoming) }
     }

@@ -30,6 +30,12 @@ class CloudixSettings(private val context: Context) {
     var dynamic: Boolean
         get() = prefs.getBoolean("dynamic", true)
         set(v) = prefs.edit().putBoolean("dynamic", v).apply()
+    var animations: Boolean
+        get() = prefs.getBoolean("animations", true)
+        set(value) = prefs.edit().putBoolean("animations", value).apply()
+    var sort: String
+        get() = prefs.getString("sort", "name") ?: "name"
+        set(value) = prefs.edit().putString("sort", value).apply()
     var accent: Int
         get() = prefs.getInt("accent", 0)
         set(v) = prefs.edit().putInt("accent", v).apply()
