@@ -181,7 +181,8 @@ data class Peer(
     val port: Int,
     val secret: String,
     val pin: String,
-    val globalIpv6: String? = null
+    val globalIpv6: String? = null,
+    val tailscale: String? = null
 ) {
     companion object {
         fun isNumericIp(value: String): Boolean {
@@ -206,15 +207,27 @@ data class Peer(
             val key = uri.getQueryParameter("secret") ?: ""
             val pin = uri.getQueryParameter("fingerprint") ?: ""
             val ipv6 = uri.getQueryParameter("ipv6")
+            val tailscale = uri.getQueryParameter("tailscale")
             require(isNumericIp(host) && port in 1..65535 &&
                 key.matches(Regex("[A-Za-z0-9_-]{43}")) &&
                 pin.matches(Regex("[a-f0-9]{64}")) &&
-                (ipv6 == null || isPublicV6(ipv6))) {
+                (ipv6 == null || isPublicV6(ipv6)) &&
+                (tailscale == null || CloudixTailnet.isTailnetIpv4(tailscale))) {
                 "Paramètres d'appairage invalides"
             }
-            return Peer(host, port, key, pin, ipv6)
+            return Peer(host, port, key, pin, ipv6, tailscale)
         }
     }
+
+    fun withTailnetAddress(address: String): Peer {
+        require(CloudixTailnet.isTailnetIpv4(address)) { "Adresse Tailscale invalide" }
+        return copy(tailscale = address)
+    }
+
+    fun pairingLink(): String = "cloudix://pair?host=${Uri.encode(host)}" +
+        "&port=${port}&secret=${Uri.encode(secret)}&fingerprint=${pin}" +
+        (globalIpv6?.let { "&ipv6=${Uri.encode(it)}" } ?: "") +
+        (tailscale?.let { "&tailscale=${Uri.encode(it)}" } ?: "")
 
     fun endpoints(preferIpv6: Boolean): List<String> {
         val ips = listOfNotNull(globalIpv6, host).distinct()
@@ -245,11 +258,18 @@ class CloudixClient(
         return capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true
     }
 
-    fun selectedAddress(): String = peer.endpoints(preferIpv6()).first()
+    // The VPN route is stable across Wi-Fi/5G and avoids a blocked home IPv6 firewall.
+    fun selectedAddress(): String = peer.tailscale ?: peer.endpoints(preferIpv6()).first()
 
     private fun hostname(): String = selectedAddress()
 
     private fun describeFailure(e: Exception): Exception {
+        if (peer.tailscale != null &&
+            (e is java.net.ConnectException || e is java.net.SocketTimeoutException ||
+             e is java.net.NoRouteToHostException)) {
+            return CloudixConnectionException(
+                "Tailscale ne répond pas. Active le VPN Tailscale sur les deux téléphones, vérifie qu'ils sont sur le même compte, puis relance le test.", e)
+        }
         if (preferIpv6() && peer.globalIpv6 != null &&
             (e is java.net.ConnectException || e is java.net.SocketTimeoutException ||
              e is java.net.NoRouteToHostException)) {
@@ -263,7 +283,7 @@ class CloudixClient(
         val cm = context?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
         val caps = cm?.getNetworkCapabilities(cm.activeNetwork)
         if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true &&
-            peer.globalIpv6 == null && peer.host.matches(Regex("(\\d{1,3}\\.){3}\\d{1,3}"))) {
+            peer.globalIpv6 == null && peer.tailscale == null && peer.host.matches(Regex("(\\d{1,3}\\.){3}\\d{1,3}"))) {
             throw CloudixConnectionException("Aucune IPv6 publique enregistrée : le réseau local du Xiaomi n'est pas joignable depuis la 5G sans relais ni accès à la box.")
         }
         val ip = hostname()
