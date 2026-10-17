@@ -39,6 +39,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import java.util.UUID
+import java.util.concurrent.TimeUnit
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import com.journeyapps.barcodescanner.ScanContract
@@ -86,6 +90,11 @@ fun CloudixApp(incoming: String) {
     var searchQuery by remember { mutableStateOf("") }
     var backupError by remember { mutableStateOf(settings.lastBackupError) }
     var backupLastAt by remember { mutableLongStateOf(settings.lastBackupAt) }
+    var backupItems by remember { mutableIntStateOf(settings.lastBackupItems) }
+    var manualBackupId by remember { mutableStateOf(settings.lastManualBackupId) }
+    var manualBackupInfo by remember { mutableStateOf<WorkInfo?>(null) }
+    var backupNotice by remember { mutableStateOf("") }
+    var manualBackupStarting by remember { mutableStateOf(false) }
     var diagnostic by remember { mutableStateOf("") }
     var connectionVerified by remember { mutableStateOf(false) }
     var connectionChecking by remember { mutableStateOf(false) }
@@ -196,14 +205,22 @@ fun CloudixApp(incoming: String) {
     LaunchedEffect(role, peerLink, currentPath) {
         if (role == "client" && peerLink.isNotEmpty()) refresh()
     }
-    LaunchedEffect(role, page) {
+    LaunchedEffect(role, page, manualBackupId) {
         if (role == "client" && page == 2) {
-            // WorkManager runs in a different instance of CloudixSettings.
-            // Refresh its persisted result while the Backup page is visible.
+            // Worker runs independently of Compose. Observe its actual WorkInfo ID,
+            // not merely whether the request was accepted by WorkManager.
             while (true) {
                 backupError = settings.lastBackupError
                 backupLastAt = settings.lastBackupAt
-                delay(3_000)
+                backupItems = settings.lastBackupItems
+                manualBackupInfo = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val id = UUID.fromString(manualBackupId)
+                        WorkManager.getInstance(context).getWorkInfoById(id)
+                            .get(3, TimeUnit.SECONDS)
+                    }.getOrNull()
+                }
+                delay(1_500)
             }
         }
     }
@@ -652,19 +669,94 @@ fun CloudixApp(incoming: String) {
                                         Icon(Icons.Rounded.Add, null)
                                         Spacer(Modifier.width(8.dp)); Text("Ajouter un dossier à sauvegarder")
                                     }
-                                    OutlinedButton(onClick = {
-                                        if (peerLink.isBlank() || settings.backupFolders.isEmpty()) {
-                                            message = "Connecte un serveur et sélectionne au moins un dossier."
-                                        } else {
-                                            BackupScheduler.runNow(context)
-                                            message = if (settings.wifiOnly) "Sauvegarde programmée : attente d’un réseau Wi-Fi non facturé." else "Sauvegarde programmée : Wi-Fi ou réseau mobile autorisé. Vérifie que le serveur est accessible."
-                                        }
-                                    }, modifier = Modifier.fillMaxWidth()) {
+                                    OutlinedButton(
+                                        enabled = !manualBackupStarting &&
+                                            manualBackupInfo?.state != WorkInfo.State.RUNNING,
+                                        onClick = {
+                                            if (peerLink.isBlank() || settings.backupFolders.isEmpty()) {
+                                                backupNotice = "Sélectionne au moins un dossier et connecte le Xiaomi."
+                                            } else {
+                                                scope.launch {
+                                                    manualBackupStarting = true
+                                                    backupNotice = "Vérification de la connexion sécurisée au Xiaomi..."
+                                                    try {
+                                                        // Distinguish a reachable Xiaomi from a queued request:
+                                                        // this ping uses exactly the same peer/Tailscale route as the Worker.
+                                                        withContext(Dispatchers.IO) {
+                                                            CloudixClient(Peer.parse(peerLink), context,
+                                                                connectTimeoutMs = 6_000,
+                                                                readTimeoutMs = 10_000).ping()
+                                                        }
+                                                        manualBackupId = BackupScheduler.runNow(context).toString()
+                                                        manualBackupInfo = null
+                                                        backupError = ""
+                                                        backupNotice = if (settings.wifiOnly)
+                                                            "Serveur joignable. La sauvegarde attend un réseau non facturé."
+                                                        else "Serveur joignable. Sauvegarde demandée sur Wi-Fi ou 4G/5G."
+                                                    } catch (e: Exception) {
+                                                        backupNotice =
+                                                            "Sauvegarde non lancée : ${e.message ?: "connexion impossible"}"
+                                                    } finally {
+                                                        manualBackupStarting = false
+                                                    }
+                                                }
+                                            }
+                                        }, modifier = Modifier.fillMaxWidth()
+                                    ) {
                                         Icon(Icons.Rounded.Sync, null)
                                         Spacer(Modifier.width(8.dp))
-                                        Text("Sauvegarder maintenant")
+                                        Text(if (manualBackupStarting) "Connexion..." else "Sauvegarder maintenant")
                                     }
-                                    if (backupError.isNotBlank()) {
+                                    val work = manualBackupInfo
+                                    val working = work?.state == WorkInfo.State.RUNNING
+                                    val queued = work?.state == WorkInfo.State.ENQUEUED ||
+                                        work?.state == WorkInfo.State.BLOCKED
+                                    val savedNow = if (work?.state == WorkInfo.State.SUCCEEDED)
+                                        work.outputData.getInt("uploaded", backupItems)
+                                    else work?.progress?.getInt("uploaded", backupItems) ?: backupItems
+                                    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                                        Column(Modifier.padding(16.dp),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Text("État de la sauvegarde",
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.SemiBold)
+                                            Text(when {
+                                                manualBackupStarting -> "Connexion au serveur..."
+                                                working -> work?.progress?.getString("phase")
+                                                    ?: "Sauvegarde en cours..."
+                                                queued && backupError.isNotBlank() ->
+                                                    "Nouvelle tentative : $backupError"
+                                                queued -> if (settings.wifiOnly)
+                                                    "En attente d’un réseau non facturé ou d’Android..."
+                                                else "En attente du lancement par Android (Wi-Fi / 4G / 5G)..."
+                                                work?.state == WorkInfo.State.SUCCEEDED ->
+                                                    if (savedNow == 0) "Terminé : les fichiers sont déjà sauvegardés."
+                                                    else "Terminé : $savedNow fichier(s) transféré(s) au Xiaomi."
+                                                work?.state == WorkInfo.State.FAILED ->
+                                                    "Sauvegarde échouée : ${work.outputData.getString("error")
+                                                        ?: backupError.ifBlank { "Consulte le diagnostic." }}"
+                                                work?.state == WorkInfo.State.CANCELLED ->
+                                                    "Sauvegarde interrompue."
+                                                backupNotice.isNotBlank() -> backupNotice
+                                                else -> "Aucune sauvegarde manuelle récente."
+                                            }, style = MaterialTheme.typography.bodyMedium)
+                                            if (working || manualBackupStarting) {
+                                                LinearProgressIndicator(Modifier.fillMaxWidth())
+                                            }
+                                            if (working && savedNow > 0) {
+                                                Text("$savedNow fichier(s) transféré(s)",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                            if (backupNotice.isNotBlank() && work?.state != WorkInfo.State.SUCCEEDED) {
+                                                Text(backupNotice,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                        }
+                                    }
+                                    if (backupError.isNotBlank() &&
+                                        manualBackupInfo?.state != WorkInfo.State.FAILED) {
                                         Text(backupError,
                                             color = MaterialTheme.colorScheme.error,
                                             style = MaterialTheme.typography.bodyMedium)
