@@ -194,7 +194,7 @@ fun CloudixApp(incoming: String) {
         currentPath = currentPath.substringBeforeLast('/', "")
     }
 
-    CloudixTheme(settings, revision) {
+    CloudixTheme(settings) {
         if (role.isBlank()) {
             WelcomeScreen(onServer = { role = "server"; settings.role = role },
                 onClient = { role = "client"; settings.role = role })
@@ -210,7 +210,7 @@ fun CloudixApp(incoming: String) {
                     }, label = "cloudix-navigation") { tab ->
                     Box(Modifier.fillMaxSize().padding(insets)) {
                         when (tab) {
-                            0 -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                            0 -> Column(Modifier.fillMaxSize().verticalScrollCompat()
                                 .padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                                 if (role == "server") {
                                     HeroCard(
@@ -459,7 +459,7 @@ fun CloudixApp(incoming: String) {
                                 }
                             }
                             1 -> if (role == "server") {
-                                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                                Column(Modifier.fillMaxSize().verticalScrollCompat()
                                     .padding(20.dp)) {
                                     SectionTitle("Stockage partagé")
                                     SettingItem(Icons.Rounded.Folder, "Dossier racine", rootUri.ifBlank { "Non sélectionné" }) {
@@ -589,7 +589,7 @@ fun CloudixApp(incoming: String) {
                                 }
                             }
                             2 -> if (role == "client") {
-                                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
+                                Column(Modifier.fillMaxSize().verticalScrollCompat().padding(20.dp)) {
                                     SectionTitle("Sauvegardes automatiques")
                                     Text("Cloudix transfère uniquement les dossiers que tu autorises. Android planifie les tâches en arrière-plan (fréquence approximative).",
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -654,7 +654,7 @@ fun CloudixApp(incoming: String) {
                                 }
                             }
                             3 -> AppearancePage(settings) { revision++ }
-                            4 -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
+                            4 -> Column(Modifier.fillMaxSize().verticalScrollCompat().padding(20.dp)) {
                                 SectionTitle("Configuration")
                                 SettingItem(Icons.Rounded.Security, "Chiffrement et appairage",
                                     "TLS avec certificat épinglé et secret aléatoire")
