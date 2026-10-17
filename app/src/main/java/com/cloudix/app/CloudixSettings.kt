@@ -42,6 +42,12 @@ class CloudixSettings(private val context: Context) {
     var wifiOnly: Boolean
         get() = prefs.getBoolean("wifi_only", true)
         set(v) = prefs.edit().putBoolean("wifi_only", v).apply()
+    var lastBackupAt: Long
+        get() = prefs.getLong("last_backup_at", 0)
+        set(v) = prefs.edit().putLong("last_backup_at", v).apply()
+    var lastBackupItems: Int
+        get() = prefs.getInt("last_backup_items", 0)
+        set(v) = prefs.edit().putInt("last_backup_items", v).apply()
     var interval: Long
         get() = prefs.getLong("interval", 60)
         set(v) = prefs.edit().putLong("interval", v).apply()

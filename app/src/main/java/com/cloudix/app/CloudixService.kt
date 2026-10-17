@@ -215,7 +215,8 @@ class CloudixService : Service() {
                         val name = file.name ?: continue
                         array.put(JSONObject().put("name", name)
                             .put("path", if (path.isEmpty()) name else "$path/$name")
-                            .put("directory", file.isDirectory).put("size", file.length()))
+                            .put("directory", file.isDirectory).put("size", file.length())
+                            .put("modified", file.lastModified()).put("mime", file.type ?: ""))
                     }
                     response(out, 200, array.toString().toByteArray())
                     CloudixStatus.successfulRequests.value += 1
@@ -240,6 +241,20 @@ class CloudixService : Service() {
                     if (dir.findFile(name) != null) { json(out, 409, "Existe déjà"); return }
                     require(dir.createDirectory(name) != null) { "Création impossible" }
                     json(out, 200, "Dossier créé")
+                }
+                method == "POST" && url.path == "/api/rename" -> {
+                    require(path.isNotBlank()) { "Racine non modifiable" }
+                    val name = arg("name")
+                    require(validName(name)) { "Nom invalide" }
+                    val file = locate(path)
+                    val parent = path.substringBeforeLast('/', "")
+                    val sibling = locate(parent).findFile(name)
+                    if (sibling != null) {
+                        json(out, 409, "Ce nom existe déjà")
+                        return
+                    }
+                    require(file.renameTo(name)) { "Renommage impossible" }
+                    json(out, 200, "Renommé")
                 }
                 method == "POST" && url.path == "/api/delete" -> {
                     require(path.isNotBlank()) { "Suppression de la racine interdite" }

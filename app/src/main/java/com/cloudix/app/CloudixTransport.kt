@@ -113,7 +113,14 @@ data class Peer(val host: String, val port: Int, val secret: String, val pin: St
     }
 }
 
-data class RemoteFile(val name: String, val path: String, val directory: Boolean, val size: Long)
+data class RemoteFile(
+    val name: String,
+    val path: String,
+    val directory: Boolean,
+    val size: Long,
+    val modified: Long = 0L,
+    val mime: String = ""
+)
 class CloudixClient(val peer: Peer) {
     private fun connection(route: String, method: String = "GET"): HttpsURLConnection {
         val url = URL("https://${peer.host}:${peer.port}$route")
@@ -146,11 +153,15 @@ class CloudixClient(val peer: Peer) {
         return (0 until items.length()).map { i ->
             val obj = items.getJSONObject(i)
             RemoteFile(obj.getString("name"), obj.getString("path"),
-                obj.getBoolean("directory"), obj.optLong("size", 0L))
+                obj.getBoolean("directory"), obj.optLong("size", 0L),
+                obj.optLong("modified", 0L), obj.optString("mime", ""))
         }
     }
     fun mkdir(path: String, name: String) {
         request("/api/mkdir?path=${Uri.encode(path)}&name=${Uri.encode(name)}", "POST")
+    }
+    fun rename(path: String, name: String) {
+        request("/api/rename?path=${Uri.encode(path)}&name=${Uri.encode(name)}", "POST")
     }
     fun delete(path: String) {
         request("/api/delete?path=${Uri.encode(path)}", "POST")

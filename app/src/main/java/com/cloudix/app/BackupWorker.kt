@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.documentfile.provider.DocumentFile
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
@@ -24,6 +25,15 @@ object BackupScheduler {
         ).setConstraints(constraints).build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             "cloudix_backup", ExistingPeriodicWorkPolicy.UPDATE, request)
+    }
+    fun runNow(context: Context) {
+        val settings = CloudixSettings(context)
+        val constraints = Constraints.Builder().setRequiredNetworkType(
+            if (settings.wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED
+        ).build()
+        WorkManager.getInstance(context).enqueue(
+            OneTimeWorkRequestBuilder<BackupWorker>().setConstraints(constraints).build()
+        )
     }
     fun cancel(context: Context) =
         WorkManager.getInstance(context).cancelUniqueWork("cloudix_backup")
@@ -74,6 +84,8 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                     }
                 }
             }
+            settings.lastBackupAt = System.currentTimeMillis()
+            settings.lastBackupItems = counter
             Result.success()
         } catch (_: Exception) {
             Result.retry()
