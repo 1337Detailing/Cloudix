@@ -3,6 +3,10 @@ package com.cloudix.app
 import android.content.Context
 import android.net.Uri
 import android.util.Base64
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import org.json.JSONObject
 import java.net.NetworkInterface
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -24,24 +28,98 @@ class CloudixSettings(private val context: Context) {
     var peer: String
         get() = secureRead("peer")
         set(v) = secureWrite("peer", v)
+    /**
+     * Single Compose-observable state. Previously, updating SharedPreferences did not
+     * invalidate CloudixTheme; the UI only refreshed after restarting the activity.
+     */
+    var appearance by mutableStateOf(loadAppearance())
+        private set
+
+    private fun loadAppearance(): AppearanceSnapshot {
+        val json = runCatching {
+            JSONObject(prefs.getString("appearance_overrides", "{}") ?: "{}")
+        }.getOrDefault(JSONObject())
+        val colors = mutableMapOf<String, String>()
+        for (role in CloudixColorRole.entries) {
+            val color = json.optString(role.key)
+            CloudixHex.normalize(color)?.let { colors[role.key] = it }
+        }
+        return AppearanceSnapshot(
+            theme = prefs.getString("theme", "system")?.takeIf {
+                it in listOf("system", "light", "dark")
+            } ?: "system",
+            dynamic = prefs.getBoolean("dynamic", true),
+            accent = prefs.getInt("accent", 0).coerceIn(0, CloudixAppearanceCatalog.presets.lastIndex),
+            surfaceStyle = prefs.getString("surface_style", "soft")?.takeIf {
+                it in CloudixAppearanceCatalog.styles.map { style -> style.first }
+            } ?: "soft",
+            animations = prefs.getBoolean("animations", true),
+            overrides = colors
+        )
+    }
+
+    private fun updateAppearance(next: AppearanceSnapshot) {
+        if (next == appearance) return
+        appearance = next
+        val json = JSONObject()
+        next.overrides.forEach { (role, color) ->
+            if (CloudixColorRole.fromKey(role) != null && CloudixHex.normalize(color) != null)
+                json.put(role, color)
+        }
+        prefs.edit().putString("theme", next.theme)
+            .putBoolean("dynamic", next.dynamic)
+            .putInt("accent", next.accent)
+            .putString("surface_style", next.surfaceStyle)
+            .putBoolean("animations", next.animations)
+            .putString("appearance_overrides", json.toString()).apply()
+    }
+
     var theme: String
-        get() = prefs.getString("theme", "system") ?: "system"
-        set(v) = prefs.edit().putString("theme", v).apply()
+        get() = appearance.theme
+        set(v) {
+            require(v in listOf("system", "light", "dark"))
+            val nextStyle = if (v == "light" && appearance.surfaceStyle.startsWith("amoled"))
+                "soft" else appearance.surfaceStyle
+            updateAppearance(appearance.copy(theme = v, surfaceStyle = nextStyle))
+        }
     var dynamic: Boolean
-        get() = prefs.getBoolean("dynamic", true)
-        set(v) = prefs.edit().putBoolean("dynamic", v).apply()
+        get() = appearance.dynamic
+        set(v) = updateAppearance(appearance.copy(dynamic = v))
+    var surfaceStyle: String
+        get() = appearance.surfaceStyle
+        set(v) {
+            require(CloudixAppearanceCatalog.styles.any { it.first == v })
+            updateAppearance(appearance.copy(
+                surfaceStyle = v,
+                theme = if (v.startsWith("amoled")) "dark" else appearance.theme
+            ))
+        }
+    /** Compatibility with previous numeric intensity preference. */
     var surfaceIntensity: Int
-        get() = prefs.getInt("surface_intensity", 2)
-        set(value) = prefs.edit().putInt("surface_intensity", value.coerceIn(0, 4)).apply()
+        get() = if (surfaceStyle == "strong") 4 else 1
+        set(v) { surfaceStyle = if (v >= 3) "strong" else "soft" }
     var animations: Boolean
-        get() = prefs.getBoolean("animations", true)
-        set(value) = prefs.edit().putBoolean("animations", value).apply()
+        get() = appearance.animations
+        set(v) = updateAppearance(appearance.copy(animations = v))
     var sort: String
         get() = prefs.getString("sort", "name") ?: "name"
         set(value) = prefs.edit().putString("sort", value).apply()
     var accent: Int
-        get() = prefs.getInt("accent", 0)
-        set(v) = prefs.edit().putInt("accent", v).apply()
+        get() = appearance.accent
+        set(v) {
+            require(v in CloudixAppearanceCatalog.presets.indices)
+            updateAppearance(appearance.copy(accent = v))
+        }
+
+    fun setColorOverride(role: CloudixColorRole, value: String?) {
+        val normalized = value?.let { CloudixHex.normalize(it) }
+        require(value == null || normalized != null) { "Code couleur invalide : utilise #RRGGBB" }
+        val overrides = appearance.overrides.toMutableMap()
+        if (normalized == null) overrides.remove(role.key) else overrides[role.key] = normalized
+        updateAppearance(appearance.copy(overrides = overrides))
+    }
+    fun resetColors() = updateAppearance(appearance.copy(overrides = emptyMap()))
+    fun resetAppearance() = updateAppearance(AppearanceSnapshot())
     var serverAutoStart: Boolean
         get() = prefs.getBoolean("server_auto_start", false)
         set(value) = prefs.edit().putBoolean("server_auto_start", value).apply()
