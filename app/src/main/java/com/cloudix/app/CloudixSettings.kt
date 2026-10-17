@@ -65,8 +65,8 @@ class CloudixSettings(private val context: Context) {
         fun localAddress(): String? {
             val all = NetworkInterface.getNetworkInterfaces() ?: return null
             val interfaces = all.toList()
-            return interfaces.sortedBy { if (it.name.startsWith("wlan")) 0 else 1 }
-                .filter { it.isUp && !it.isLoopback }
+            return interfaces.filter { it.isUp && !it.isLoopback &&
+                    (it.name.startsWith("wlan") || it.name.startsWith("ap")) }
                 .flatMap { it.inetAddresses.toList() }
                 .firstOrNull { it is java.net.Inet4Address && !it.isLoopbackAddress && it.isSiteLocalAddress }
                 ?.hostAddress
