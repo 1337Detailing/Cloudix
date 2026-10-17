@@ -22,4 +22,36 @@ class UpdateMetadataTest {
             CloudixUpdateInfo(1023, "a".repeat(64), "https://evil.invalid/malicious.apk", "test").validate()
         }
     }
+
+    @Test fun rejectsNonMonotonicOrImpossibleVersionCodes() {
+        val official = "https://github.com/1337Detailing/Cloudix/releases/download/debug-latest/cloudix-debug.apk"
+        for (code in listOf(0L, -1L, Int.MAX_VALUE.toLong() + 1L)) {
+            assertThrows(IllegalArgumentException::class.java) {
+                CloudixUpdateInfo(code, "a".repeat(64), official, "beta").validate()
+            }
+        }
+    }
+
+    @Test fun preventsTamperedPathsAndUnexpectedCertificateManifests() {
+        val official = "https://github.com/1337Detailing/Cloudix/releases/download/debug-latest/cloudix-debug.apk"
+        for (url in listOf(
+            official + "?redirect=evil",
+            official.replace("https://", "http://"),
+            official.replace("cloudix-debug.apk", "cloudix-other.apk")
+        )) {
+            assertThrows(IllegalArgumentException::class.java) {
+                CloudixUpdateInfo(1080, "b".repeat(64), url, "beta").validate()
+            }
+        }
+    }
+
+    @Test fun rejectsOversizedTitlesAndUppercaseDigest() {
+        val official = "https://github.com/1337Detailing/Cloudix/releases/download/debug-latest/cloudix-debug.apk"
+        assertThrows(IllegalArgumentException::class.java) {
+            CloudixUpdateInfo(1080, "A".repeat(64), official, "beta").validate()
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            CloudixUpdateInfo(1080, "a".repeat(64), official, "x".repeat(161)).validate()
+        }
+    }
 }
