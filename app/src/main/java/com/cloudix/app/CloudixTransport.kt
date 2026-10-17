@@ -15,6 +15,10 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.URL
+import java.net.Inet6Address
+import java.net.InetAddress
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.KeyStore
@@ -172,8 +176,28 @@ object TlsIdentity {
     }
 }
 
-data class Peer(val host: String, val port: Int, val secret: String, val pin: String) {
+data class Peer(
+    val host: String,
+    val port: Int,
+    val secret: String,
+    val pin: String,
+    val globalIpv6: String? = null
+) {
     companion object {
+        fun isNumericIp(value: String): Boolean {
+            if (value.matches(Regex("(\\d{1,3}\\.){3}\\d{1,3}"))) {
+                return value.split(".").all { it.toIntOrNull() in 0..255 }
+            }
+            if (!value.contains(':') || !value.matches(Regex("[a-fA-F0-9:]+"))) return false
+            return try { InetAddress.getByName(value) is Inet6Address } catch (_: Exception) { false }
+        }
+        fun isPublicV6(value: String): Boolean {
+            if (!value.contains(':') || !value.matches(Regex("[a-fA-F0-9:]+"))) return false
+            return try {
+                val parsed = InetAddress.getByName(value)
+                parsed is Inet6Address && CloudixSettings.isGlobalIpv6(parsed)
+            } catch (_: Exception) { false }
+        }
         fun parse(link: String): Peer {
             val uri = Uri.parse(link.trim())
             require(uri.scheme == "cloudix" && uri.host == "pair") { "Lien d'appairage invalide" }
@@ -181,13 +205,20 @@ data class Peer(val host: String, val port: Int, val secret: String, val pin: St
             val port = uri.getQueryParameter("port")?.toIntOrNull() ?: 0
             val key = uri.getQueryParameter("secret") ?: ""
             val pin = uri.getQueryParameter("fingerprint") ?: ""
-            require(host.matches(Regex("(\\d{1,3}\\.){3}\\d{1,3}")) &&
-                host.split(".").all { it.toInt() in 0..255 } && port in 1..65535 &&
-                key.matches(Regex("[A-Za-z0-9_-]{43}")) && pin.matches(Regex("[a-f0-9]{64}"))) {
+            val ipv6 = uri.getQueryParameter("ipv6")
+            require(isNumericIp(host) && port in 1..65535 &&
+                key.matches(Regex("[A-Za-z0-9_-]{43}")) &&
+                pin.matches(Regex("[a-f0-9]{64}")) &&
+                (ipv6 == null || isPublicV6(ipv6))) {
                 "Paramètres d'appairage invalides"
             }
-            return Peer(host, port, key, pin)
+            return Peer(host, port, key, pin, ipv6)
         }
+    }
+
+    fun endpoints(preferIpv6: Boolean): List<String> {
+        val ips = listOfNotNull(globalIpv6, host).distinct()
+        return if (preferIpv6) ips else ips.reversed()
     }
 }
 
@@ -199,9 +230,21 @@ data class RemoteFile(
     val modified: Long = 0L,
     val mime: String = ""
 )
-class CloudixClient(val peer: Peer) {
+class CloudixClient(val peer: Peer, private val context: Context? = null) {
+    private fun preferIpv6(): Boolean {
+        if (peer.globalIpv6 == null) return false
+        val cm = context?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            ?: return false
+        val capabilities = cm.getNetworkCapabilities(cm.activeNetwork)
+        return capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true
+    }
+
+    private fun hostname(): String = peer.endpoints(preferIpv6()).first()
+
     private fun connection(route: String, method: String = "GET"): HttpsURLConnection {
-        val url = URL("https://${peer.host}:${peer.port}$route")
+        val ip = hostname()
+        val authority = if (ip.contains(':')) "[$ip]" else ip
+        val url = URL("https://$authority:${peer.port}$route")
         return (url.openConnection() as HttpsURLConnection).apply {
             sslSocketFactory = TlsIdentity.clientContext(peer.pin).socketFactory
             hostnameVerifier = javax.net.ssl.HostnameVerifier { _, _ -> true } // pin is verified by TrustManager

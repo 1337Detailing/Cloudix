@@ -121,8 +121,9 @@ class CloudixSettings(private val context: Context) {
         secret()
     }
     fun serverLink(): String {
-        val address = localAddress() ?: return ""
-        return "cloudix://pair?host=${Uri.encode(address)}&port=8731&secret=${Uri.encode(secret())}&fingerprint=${TlsIdentity.fingerprint(context)}"
+        val address = localAddress() ?: globalIpv6Address() ?: return ""
+        val alternative = globalIpv6Address()?.let { "&ipv6=${Uri.encode(it)}" } ?: ""
+        return "cloudix://pair?host=${Uri.encode(address)}&port=8731&secret=${Uri.encode(secret())}&fingerprint=${TlsIdentity.fingerprint(context)}${alternative}"
     }
     companion object {
         fun localAddress(): String? {
@@ -133,6 +134,24 @@ class CloudixSettings(private val context: Context) {
                 .flatMap { it.inetAddresses.toList() }
                 .firstOrNull { it is java.net.Inet4Address && !it.isLoopbackAddress && it.isSiteLocalAddress }
                 ?.hostAddress
+        }
+        /**
+         * This checks for an IPv6 global unicast address, NOT remote reachability.
+         * Router firewalls may still drop inbound traffic even if the address exists.
+         */
+        fun globalIpv6Address(): String? = try {
+            val interfaces = NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
+            interfaces.filter { it.isUp && !it.isLoopback &&
+                    (it.name.startsWith("wlan") || it.name.startsWith("ap")) }
+                .flatMap { it.inetAddresses.toList() }
+                .filterIsInstance<java.net.Inet6Address>()
+                .firstOrNull { a -> isGlobalIpv6(a) }?.hostAddress?.substringBefore('%')
+        } catch (_: Exception) { null }
+
+        fun isGlobalIpv6(a: java.net.Inet6Address): Boolean {
+            val first = a.address[0].toInt() and 0xff
+            return first in 0x20..0x3f && !a.isMulticastAddress &&
+                !a.isLinkLocalAddress && !a.isLoopbackAddress
         }
         fun fingerprint(cert: ByteArray): String =
             MessageDigest.getInstance("SHA-256").digest(cert).joinToString("") { "%02x".format(it) }
