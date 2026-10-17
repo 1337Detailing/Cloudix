@@ -42,6 +42,9 @@ class CloudixSettings(private val context: Context) {
     var accent: Int
         get() = prefs.getInt("accent", 0)
         set(v) = prefs.edit().putInt("accent", v).apply()
+    var serverAutoStart: Boolean
+        get() = prefs.getBoolean("server_auto_start", false)
+        set(value) = prefs.edit().putBoolean("server_auto_start", value).apply()
     var wifiOnly: Boolean
         get() = prefs.getBoolean("wifi_only", true)
         set(v) = prefs.edit().putBoolean("wifi_only", v).apply()

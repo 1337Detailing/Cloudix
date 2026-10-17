@@ -537,6 +537,17 @@ fun CloudixApp(incoming: String) {
                                 SettingItem(Icons.Rounded.Security, "Chiffrement et appairage",
                                     "TLS avec certificat épinglé et secret aléatoire")
                                 if (role == "server") {
+                                    SettingItem(Icons.Rounded.PowerSettingsNew,
+                                        "Démarrer après redémarrage",
+                                        "Lancer automatiquement le serveur au démarrage du Xiaomi") {
+                                        Switch(checked = settings.serverAutoStart,
+                                            onCheckedChange = {
+                                                settings.serverAutoStart = it; revision++
+                                            })
+                                    }
+                                    Text("HyperOS peut bloquer les démarrages automatiques : autorise Cloudix dans les paramètres d'activité en arrière-plan.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     OutlinedButton(onClick = {
                                         settings.regenerateSecret()
                                         message = "Ancien appairage révoqué. Partage un nouveau QR code."
