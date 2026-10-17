@@ -45,6 +45,9 @@ class CloudixSettings(private val context: Context) {
     var serverAutoStart: Boolean
         get() = prefs.getBoolean("server_auto_start", false)
         set(value) = prefs.edit().putBoolean("server_auto_start", value).apply()
+    var preferDirectIpv6: Boolean
+        get() = prefs.getBoolean("prefer_direct_ipv6", false)
+        set(value) = prefs.edit().putBoolean("prefer_direct_ipv6", value).apply()
     var wifiOnly: Boolean
         get() = prefs.getBoolean("wifi_only", true)
         set(v) = prefs.edit().putBoolean("wifi_only", v).apply()

@@ -336,6 +336,15 @@ fun CloudixApp(incoming: String) {
                                                 else
                                                     "IPv6 enregistrée : active la 5G et lance Tester.")
                                         }
+                                        if (paired?.globalIpv6 != null) {
+                                            SettingItem(Icons.Rounded.SettingsEthernet, "Privilégier IPv6",
+                                                "Utiliser l'adresse IPv6 même quand le Vivo est en Wi-Fi") {
+                                                Switch(settings.preferDirectIpv6, onCheckedChange = {
+                                                    settings.preferDirectIpv6 = it
+                                                    revision++
+                                                })
+                                            }
+                                        }
                                         SectionTitle("Raccourcis")
                                         SettingItem(Icons.Rounded.CheckCircle, "Tester la connexion",
                                             diagnostic.ifBlank { "Mesurer l'accès au Xiaomi" }) {

@@ -233,6 +233,7 @@ data class RemoteFile(
 class CloudixClient(val peer: Peer, private val context: Context? = null) {
     private fun preferIpv6(): Boolean {
         if (peer.globalIpv6 == null) return false
+        if (context != null && CloudixSettings(context).preferDirectIpv6) return true
         val cm = context?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
             ?: return false
         val capabilities = cm.getNetworkCapabilities(cm.activeNetwork)
@@ -242,6 +243,12 @@ class CloudixClient(val peer: Peer, private val context: Context? = null) {
     private fun hostname(): String = peer.endpoints(preferIpv6()).first()
 
     private fun connection(route: String, method: String = "GET"): HttpsURLConnection {
+        val cm = context?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        val caps = cm?.getNetworkCapabilities(cm.activeNetwork)
+        if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true &&
+            peer.globalIpv6 == null && peer.host.matches(Regex("(\\d{1,3}\\.){3}\\d{1,3}"))) {
+            throw CloudixConnectionException("Aucune IPv6 publique enregistrée : le réseau local du Xiaomi n'est pas joignable depuis la 5G sans relais ni accès à la box.")
+        }
         val ip = hostname()
         val authority = if (ip.contains(':')) "[$ip]" else ip
         val url = URL("https://$authority:${peer.port}$route")

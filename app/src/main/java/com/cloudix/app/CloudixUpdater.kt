@@ -62,9 +62,15 @@ object CloudixUpdater {
             val length = conn.contentLengthLong
             require(length in -1..16_384) { "Métadonnées de mise à jour trop volumineuses" }
             val data = conn.inputStream.use { stream ->
-                val bytes = stream.readNBytes(16_385)
-                require(bytes.size <= 16_384) { "Réponse GitHub trop volumineuse" }
-                JSONObject(bytes.toString(Charsets.UTF_8))
+                val buffer = java.io.ByteArrayOutputStream()
+                val chunk = ByteArray(2048)
+                while (true) {
+                    val count = stream.read(chunk)
+                    if (count < 0) break
+                    buffer.write(chunk, 0, count)
+                    require(buffer.size() <= 16_384) { "Réponse GitHub trop volumineuse" }
+                }
+                JSONObject(buffer.toString("UTF-8"))
             }
             return CloudixUpdateInfo(data.getLong("versionCode"),
                 data.getString("sha256"), data.getString("url"), data.optString("title", "Build debug")).also {
