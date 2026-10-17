@@ -84,6 +84,9 @@ fun CloudixApp(incoming: String) {
     var renameName by remember { mutableStateOf("") }
     var searchQuery by remember { mutableStateOf("") }
     var diagnostic by remember { mutableStateOf("") }
+    var connectionVerified by remember { mutableStateOf(false) }
+    var connectionChecking by remember { mutableStateOf(false) }
+    var connectionChecked by remember { mutableStateOf(false) }
 
     fun report(error: Throwable) { message = error.message ?: "Une erreur s'est produite." }
     suspend fun refresh() {
@@ -91,8 +94,14 @@ fun CloudixApp(incoming: String) {
         loading = true
         try {
             files = withContext(Dispatchers.IO) { CloudixClient(Peer.parse(peerLink), context).list(currentPath) }
+            connectionVerified = true
+            connectionChecked = true
             message = ""
-        } catch (e: Exception) { report(e) }
+        } catch (e: Exception) {
+            connectionVerified = false
+            connectionChecked = true
+            report(e)
+        }
         finally { loading = false }
     }
     val chooseRoot = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -173,6 +182,10 @@ fun CloudixApp(incoming: String) {
     }
     LaunchedEffect(role, peerLink, currentPath) {
         if (role == "client" && peerLink.isNotEmpty()) refresh()
+    }
+    LaunchedEffect(peerLink) {
+        connectionVerified = false
+        connectionChecked = false
     }
     BackHandler(enabled = role == "client" && page == 1 && currentPath.isNotBlank()) {
         currentPath = currentPath.substringBeforeLast('/', "")
@@ -292,10 +305,22 @@ fun CloudixApp(incoming: String) {
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         style = MaterialTheme.typography.bodySmall)
                                 } else {
-                                    HeroCard(if (peerLink.isBlank()) "Connecte ton serveur" else "Cloud connecté",
-                                        if (peerLink.isBlank()) "Scanne le QR code du Xiaomi pour démarrer."
-                                        else "Parcours tes fichiers et automatise tes sauvegardes.",
-                                        Icons.Rounded.CloudDone
+                                    HeroCard(
+                                        when {
+                                            peerLink.isBlank() -> "Connecte ton serveur"
+                                            connectionChecking -> "Connexion en cours"
+                                            connectionVerified -> "Xiaomi connecté"
+                                            connectionChecked -> "Xiaomi inaccessible"
+                                            else -> "Xiaomi appairé"
+                                        },
+                                        when {
+                                            peerLink.isBlank() -> "Scanne le QR code du Xiaomi pour démarrer."
+                                            connectionVerified -> "Connexion TLS active : tes fichiers sont accessibles."
+                                            connectionChecking -> "Vérification de la liaison avec le Xiaomi…"
+                                            connectionChecked -> "Le Xiaomi n'est pas joignable. Lance le diagnostic pour connaître la cause."
+                                            else -> "Le serveur est enregistré, mais sa disponibilité n'a pas été vérifiée."
+                                        },
+                                        if (connectionVerified) Icons.Rounded.CloudDone else Icons.Rounded.CloudQueue
                                     ) {
                                         Button(onClick = { page = if (peerLink.isBlank()) 0 else 1 },
                                             enabled = peerLink.isNotBlank()) {
@@ -347,18 +372,30 @@ fun CloudixApp(incoming: String) {
                                         }
                                         SectionTitle("Raccourcis")
                                         SettingItem(Icons.Rounded.CheckCircle, "Tester la connexion",
-                                            diagnostic.ifBlank { "Mesurer l'accès au Xiaomi" }) {
-                                            TextButton(onClick = {
+                                            diagnostic.ifBlank { "Vérifier Wi-Fi, IPv6, TLS et authentification" }) {
+                                            TextButton(enabled = !connectionChecking, onClick = {
                                                 scope.launch {
-                                                    diagnostic = "Connexion…"
+                                                    connectionChecking = true
+                                                    connectionVerified = false
+                                                    diagnostic = "Diagnostic en cours (maximum ~12 s)…"
                                                     try {
-                                                        val elapsed = withContext(Dispatchers.IO) {
-                                                            CloudixClient(Peer.parse(peerLink), context).ping()
+                                                        val result = withContext(Dispatchers.IO) {
+                                                            CloudixConnectivity.check(context, Peer.parse(peerLink))
                                                         }
-                                                        diagnostic = "Connecté · TLS $elapsed ms"
-                                                    } catch (e: Exception) { diagnostic = e.message ?: "Connexion impossible" }
+                                                        connectionVerified = result.reachable
+                                                        connectionChecked = true
+                                                        diagnostic = "${result.heading} · ${result.path} · ${result.elapsedMs} ms"
+                                                        if (!result.reachable) message = result.explanation
+                                                    } catch (e: Exception) {
+                                                        connectionVerified = false
+                                                        connectionChecked = true
+                                                        diagnostic = "Échec du diagnostic"
+                                                        report(e)
+                                                    } finally {
+                                                        connectionChecking = false
+                                                    }
                                                 }
-                                            }) { Text("Tester") }
+                                            }) { Text(if (connectionChecking) "Analyse…" else "Tester") }
                                         }
                                         SettingItem(Icons.Rounded.FolderOpen, "Explorer les fichiers",
                                             "Dossiers du serveur") { TextButton(onClick = { page = 1 }) { Text("Ouvrir") } }
