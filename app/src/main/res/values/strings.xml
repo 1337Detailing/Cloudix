@@ -348,4 +348,19 @@
     <string name="update_verified">APK vérifiée</string>
     <string name="update_allow_install">Autorise l\'installation d’APK pour Cloudix.</string>
     <string name="backup_device_prefix">Appareil</string>
+    <string name="net_vpn">VPN Tailscale</string>
+    <string name="net_ipv6">IPv6 directe</string>
+    <string name="net_wifi">Wi-Fi local (IPv4)</string>
+    <string name="net_no_mobile_route">Pas de route 5G</string>
+    <string name="net_remote_missing">Adresse distante indisponible.</string>
+    <string name="net_reachable">Serveur joignable</string>
+    <string name="net_tls_ok">Connexion chiffrée TLS et authentification Cloudix vérifiées.</string>
+    <string name="net_blocked">Connexion réseau bloquée</string>
+    <string name="net_tls_fail">Erreur de connexion sécurisée</string>
+    <string name="net_no_response">Serveur sans réponse</string>
+    <string name="net_vpn_off">Serveur indisponible sur le VPN. Vérifie Tailscale.</string>
+    <string name="net_inaccessible">Serveur inaccessible sur ce réseau.</string>
+    <string name="net_pair_again">Échec TLS. Associe de nouveau le serveur.</string>
+    <string name="net_unknown">Erreur réseau inconnue. Vérifie le serveur et l\'appairage.</string>
+    <string name="net_port_unreachable">Port %1$d inaccessible.</string>
 </resources>

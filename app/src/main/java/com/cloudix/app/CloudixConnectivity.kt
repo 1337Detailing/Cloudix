@@ -33,20 +33,20 @@ object CloudixConnectivity {
         val ipv6 = address.contains(':')
         val tailscale = CloudixTailnet.isTailnetIpv4(address)
         val label = when {
-            tailscale -> "VPN Tailscale"
-            ipv6 -> "IPv6 directe"
-            else -> "Wi-Fi local (IPv4)"
+            tailscale -> context.getString(R.string.net_vpn)
+            ipv6 -> context.getString(R.string.net_ipv6)
+            else -> context.getString(R.string.net_wifi)
         }
         if (mobile && !ipv6 && !tailscale && peer.host.matches(Regex("(\\d{1,3}\\.){3}\\d{1,3}"))) {
-            return ConnectionDiagnostic(false, "Pas de route 5G",
-                "Adresse distante indisponible.",
+            return ConnectionDiagnostic(false, context.getString(R.string.net_no_mobile_route),
+                context.getString(R.string.net_remote_missing),
                 path = label)
         }
         val started = System.nanoTime()
         return try {
             client.ping()
-            ConnectionDiagnostic(true, "Serveur joignable",
-                "Connexion chiffrée TLS et authentification Cloudix vérifiées.",
+            ConnectionDiagnostic(true, context.getString(R.string.net_reachable),
+                context.getString(R.string.net_tls_ok),
                 elapsedMs(started), label)
         } catch (e: Exception) {
             // CloudixClient wraps low-level networking exceptions to provide localized messages.
@@ -59,20 +59,20 @@ object CloudixConnectivity {
                 cause is NoRouteToHostException
             val invalidTls = cause is SSLHandshakeException
             val heading = when {
-                unreachable -> "Connexion réseau bloquée"
-                invalidTls -> "Erreur de connexion sécurisée"
-                else -> "Serveur sans réponse"
+                unreachable -> context.getString(R.string.net_blocked)
+                invalidTls -> context.getString(R.string.net_tls_fail)
+                else -> context.getString(R.string.net_no_response)
             }
             val explanation = when {
                 unreachable && tailscale ->
-                    "Serveur indisponible sur le VPN. Vérifie Tailscale."
+                    context.getString(R.string.net_vpn_off)
                 unreachable && ipv6 ->
-                    "Port ${peer.port} inaccessible. Vérifie le pare-feu réseau."
+                    context.getString(R.string.net_port_unreachable, peer.port)
                 unreachable ->
-                    "Serveur inaccessible sur ce réseau."
+                    context.getString(R.string.net_inaccessible)
                 invalidTls ->
-                    "Échec TLS. Associe de nouveau le serveur."
-                else -> e.message ?: "Erreur réseau inconnue. Vérifie le serveur et l'appairage."
+                    context.getString(R.string.net_pair_again)
+                else -> e.message ?: context.getString(R.string.net_unknown)
             }
             ConnectionDiagnostic(false, heading, explanation, elapsedMs(started), label)
         }
