@@ -202,6 +202,15 @@ fun CloudixApp(incoming: String) {
             if (role.isBlank()) { role = "client"; settings.role = role }
         }
     }
+    LaunchedEffect(role) {
+        if (role == "client" && settings.backupFolders.isNotEmpty()) {
+            // Migrate existing WorkManager schedules after an APK update:
+            // older Cloudix versions required NETWORK_CONNECTED even when
+            // the user had authorized VPN/4G/5G. Keep user's folder selections.
+            runCatching { BackupScheduler.schedule(context) }
+                .onFailure { backupNotice = "Programmation automatique : ${it.message}" }
+        }
+    }
     LaunchedEffect(role, peerLink, currentPath) {
         if (role == "client" && peerLink.isNotEmpty()) refresh()
     }
