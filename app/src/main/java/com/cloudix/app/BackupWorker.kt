@@ -19,6 +19,21 @@ import androidx.work.WorkManager
 import java.util.concurrent.TimeUnit
 import java.util.UUID
 
+/**
+ * Wi-Fi-only means unmetered network. For mobile/Tailscale mode, the Worker
+ * decides reachability by TLS ping: relying on NET_CAPABILITY_VALIDATED can
+ * incorrectly block an otherwise functional VPN route on Android.
+ */
+object BackupNetworkPolicy {
+    fun requiredNetworkType(wifiOnly: Boolean): NetworkType? =
+        if (wifiOnly) NetworkType.UNMETERED else null
+    fun constraints(wifiOnly: Boolean): Constraints {
+        val builder = Constraints.Builder()
+        requiredNetworkType(wifiOnly)?.let { builder.setRequiredNetworkType(it) }
+        return builder.build()
+    }
+}
+
 object BackupScheduler {
     fun schedule(context: Context) {
         val settings = CloudixSettings(context)
@@ -26,13 +41,7 @@ object BackupScheduler {
             cancel(context)
             return
         }
-        // Android sometimes marks a working Tailscale VPN as unvalidated.
-        // When mobile data is authorized, do not let WorkManager's network
-        // capability check block a route which Cloudix itself can reach.
-        // The worker performs an authenticated HTTPS ping before uploading.
-        val constraints = if (settings.wifiOnly)
-            Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build()
-        else Constraints.Builder().build()
+        val constraints = BackupNetworkPolicy.constraints(settings.wifiOnly)
         val request = PeriodicWorkRequestBuilder<BackupWorker>(
             settings.interval.coerceAtLeast(15), TimeUnit.MINUTES
         ).setConstraints(constraints).build()
@@ -41,13 +50,7 @@ object BackupScheduler {
     }
     fun runNow(context: Context): UUID {
         val settings = CloudixSettings(context)
-        // Android sometimes marks a working Tailscale VPN as unvalidated.
-        // When mobile data is authorized, do not let WorkManager's network
-        // capability check block a route which Cloudix itself can reach.
-        // The worker performs an authenticated HTTPS ping before uploading.
-        val constraints = if (settings.wifiOnly)
-            Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build()
-        else Constraints.Builder().build()
+        val constraints = BackupNetworkPolicy.constraints(settings.wifiOnly)
         // Expedited work starts as soon as Android permits it; it does not wait
         // for the next periodic backup interval. Quota fallback remains safe.
         val builder = OneTimeWorkRequestBuilder<BackupWorker>().setConstraints(constraints)
