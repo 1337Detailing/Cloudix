@@ -3,7 +3,6 @@ package com.cloudix.app
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import androidx.core.content.ContextCompat
 
 class CloudixBootReceiver : BroadcastReceiver() {
@@ -16,9 +15,8 @@ class CloudixBootReceiver : BroadcastReceiver() {
                 ContextCompat.startForegroundService(context,
                     Intent(context, CloudixService::class.java))
             }
-        } catch (e: Exception) {
-            // OEM policies may block background launches after reboot.
-            Log.w("CloudixBoot", "Automatic startup prevented", e)
+        } catch (_: Exception) {
+            CloudixStatus.error.value = context.getString(R.string.server_start_failed)
         }
     }
 }

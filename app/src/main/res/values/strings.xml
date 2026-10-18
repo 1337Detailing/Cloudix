@@ -255,7 +255,6 @@
     <string name="main_masquer_le_qr">Masquer le QR</string>
     <string name="main_afficher_le_qr">Afficher le QR</string>
     <string name="main_partager_le_lien">Partager le lien</string>
-    <string name="main_format_n_todouble_1024_0_1024_1024_go">.format(n.toDouble() / (1024.0 * 1024 * 1024))} Go</string>
     <string name="common_accueil">Accueil</string>
     <string name="common_stockage">Stockage</string>
     <string name="common_themes">Thèmes</string>
@@ -328,9 +327,6 @@
     <string name="label_modifier_1" formatted="false">Modifier %1$s</string>
     <string name="vpn_server_address">Serveur : %1$s · VPN</string>
     <string name="backup_files_uploaded">%1$d fichier(s) transféré(s)</string>
-    <string name="backup_select_folder">Choisis un dossier à sauvegarder.</string>
-    <string name="vpn_server_hint">Adresse VPN du serveur (100.x.x.x)</string>
-    <string name="server_autostart_desc">Démarrage automatique</string>
     <string name="msg_download_complete">Fichier téléchargé : %1$s</string>
     <string name="msg_backup_scheduled_issue">Programmation : %1$s</string>
     <string name="msg_tls_ok_ms">TLS actif · %1$d ms</string>
@@ -345,8 +341,6 @@
     <string name="status_selected">Sélectionné</string>
     <string name="update_download_progress">Téléchargement : %1$d %%</string>
     <string name="update_new_version">Build disponible : %1$s (%2$d)</string>
-    <string name="update_verified">APK vérifiée</string>
-    <string name="update_allow_install">Autorise l\'installation d’APK pour Cloudix.</string>
     <string name="backup_device_prefix">Appareil</string>
     <string name="net_vpn">VPN Tailscale</string>
     <string name="net_ipv6">IPv6 directe</string>
@@ -422,7 +416,6 @@
     <string name="err_timeout">Connexion expirée.</string>
     <string name="err_dropped">Connexion interrompue.</string>
     <string name="err_unknown">Connexion impossible.</string>
-    <string name="err_incomplete_file">Fichier incomplet</string>
     <string name="err_tls">Connexion sécurisée refusée.</string>
     <string name="err_socket">Connexion fermée.</string>
     <string name="err_http">Erreur serveur HTTP %1$d.</string>
