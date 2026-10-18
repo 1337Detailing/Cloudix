@@ -25,7 +25,7 @@ fun UpdatesPanel() {
     var checking by remember { mutableStateOf(false) }
     var progress by remember { mutableIntStateOf(-1) }
     var missingChannel by remember { mutableStateOf(false) }
-    SectionTitle(context.getString(R.string.update_mises_a_jour), context.getString(R.string.update_canal_debug))
+    SectionTitle(context.getString(R.string.update_mises_a_jour))
     SettingItem(Icons.Rounded.SystemUpdateAlt,
         context.getString(R.string.update_version_installee), "Build ${CloudixUpdater.currentVersionCode(context)}")
     Text(state, style = MaterialTheme.typography.bodySmall,
