@@ -144,7 +144,10 @@ object TlsIdentity {
 
     fun serverContext(context: Context): SSLContext {
         val identity = identity(context)
-        val storePassword = "cloudix-ephemeral-keystore".toCharArray()
+        // Temporary in-memory PKCS12: use a new random password every process.
+        // The persistent TLS identity remains encrypted with AndroidKeyStore.
+        val storePassword = ByteArray(32).also(SecureRandom()::nextBytes)
+            .joinToString("") { "%02x".format(it) }.toCharArray()
         val store = KeyStore.getInstance("PKCS12").apply {
             load(null, storePassword)
             setKeyEntry("server", identity.privateKey, storePassword,
