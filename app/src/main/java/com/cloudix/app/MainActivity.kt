@@ -950,6 +950,7 @@ fun CloudixApp(incoming: String) {
 
 @Composable
 private fun PairInput(link: String, onLink: (String) -> Unit, onScan: () -> Unit, onConnect: () -> Unit) {
+    val context = LocalContext.current
     ElevatedCard(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.extraLarge) {
         Column(Modifier.padding(20.dp)) {
             SectionTitle(context.getString(R.string.main_associer_ton_serveur))
@@ -969,6 +970,7 @@ private fun PairInput(link: String, onLink: (String) -> Unit, onScan: () -> Unit
 }
 @Composable
 private fun PairingCard(link: String, onShare: () -> Unit) {
+    val context = LocalContext.current
     var reveal by remember { mutableStateOf(false) }
     ElevatedCard(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.extraLarge) {
         Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1004,5 +1006,5 @@ private fun readableBytes(n: Long): String = when {
     n < 1024 -> "$n o"
     n < 1024 * 1024 -> "${n / 1024} Ko"
     n < 1024L * 1024L * 1024L -> "${n / (1024 * 1024)} Mo"
-    else -> "${"%.1fcontext.getString(R.string.main_format_n_todouble_1024_0_1024_1024_go)
+    else -> "%.1f Go".format(java.util.Locale.getDefault(), n.toDouble() / (1024.0 * 1024 * 1024))
 }

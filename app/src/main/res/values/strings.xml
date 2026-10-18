@@ -137,7 +137,7 @@
     <string name="main_indisponible_sur_le_wi_fi_du_serveur">Indisponible sur ce réseau</string>
     <string name="main_actualiser_l_adresse_ipv6">Actualiser l\'adresse IPv6</string>
     <string name="main_aucune_ipv6_publique_detectee_sans_acces_a_la">Aucune IPv6 publique détectée. Sans accès à la box ni relais, la connexion 5G directe est impossible sur ce réseau.</string>
-    <string name="main_ipv6_detectee_teste_le_qr_depuis_le_serveur_en_5">IPv6 détectée. Teste l'accès distant.</string>
+    <string name="main_ipv6_detectee_teste_le_qr_depuis_le_serveur_en_5">IPv6 détectée. Teste l\'accès distant.</string>
     <string name="main_connecte_ton_serveur">Connecte ton serveur</string>
     <string name="main_connexion_en_cours">Connexion en cours</string>
     <string name="main_serveur_connecte">Serveur connecté</string>
