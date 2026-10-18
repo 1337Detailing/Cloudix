@@ -1,29 +1,29 @@
 # Cloudix — site vitrine
 
-Site français monopage, sans compilation ni framework. HTML / CSS / JavaScript, WebGL Three.js chargé uniquement lorsque le visuel 3D est visible, GSAP ScrollTrigger et Lenis en améliorations progressives.
+Site monopage français, sans build : HTML, CSS, JavaScript, Three.js (3D chargée à la demande), GSAP ScrollTrigger et Lenis.
+
+## Site public
+
+**https://1337detailing.github.io/Cloudix/**
+
+Le site public est publié depuis le dépôt GitHub Pages déjà actif : [1337Detailing/1337detailing.github.io](https://github.com/1337Detailing/1337detailing.github.io/tree/main/Cloudix), dossier `Cloudix/`. Le dépôt Android `Cloudix` contient une copie du code dans `website/`, avec validation automatique. Une modification de cette copie ne met pas automatiquement à jour le site public : modifier les fichiers du dossier `Cloudix/` dans le dépôt GitHub Pages pour republier.
 
 ## Tester en local
-
-Depuis le dépôt :
 
 ```sh
 cd website
 python3 -m http.server 8000
 ```
 
-Ouvrir http://localhost:8000/ (le site et ses liens marchent sans construire de bundle ; l'animation Three.js dépend d'une connexion aux CDN).
+Ouvrir http://localhost:8000/.
 
-## Personnaliser
+## Ajustements
 
-- Couleur sable : `website/styles.css` variable `--sand`.
+- Couleur sable : `website/styles.css`, variable `--sand`.
 - Textes et liens : `website/index.html`.
-- Visuel 3D : `website/app.js`, fonction `bootThree`.
-- Favicon et aperçu : `website/assets/`.
-
-## GitHub Pages
-
-Le workflow `.github/workflows/cloudix-pages.yml` publie automatiquement `website/` lors des modifications de `main`, et peut être lancé manuellement. Dans **Settings → Pages → Build and deployment**, la source doit être **GitHub Actions**. L'adresse publique attendue est `https://1337detailing.github.io/Cloudix/`. L'activation initiale de GitHub Pages dépend des paramètres du dépôt.
+- 3D : `website/app.js`, fonction `bootThree`.
+- Assets : `website/assets/`.
 
 ## Accessibilité et performances
 
-Le contenu s'affiche avant les animations. Un visuel CSS est présent si WebGL/CDN est indisponible. Le site respecte `prefers-reduced-motion`, le clavier, et limite la résolution et le nombre de FPS sur mobile. Aucun compte ni traqueur n'est nécessaire.
+Contenu visible sans JavaScript, visuel CSS si WebGL/CDN échoue, prise en charge de `prefers-reduced-motion`, navigation au clavier, animations et résolution limitées sur mobile. Pas de cookies analytiques.
