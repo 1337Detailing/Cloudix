@@ -310,7 +310,7 @@ fun CloudixApp(incoming: String) {
                                                 try {
                                                     val latency = withContext(Dispatchers.IO) {
                                                         CloudixClient(Peer("127.0.0.1", 8731,
-                                                            settings.secret(), TlsIdentity.fingerprint(context))).ping()
+                                                            settings.secret(), TlsIdentity.fingerprint(context)), context).ping()
                                                     }
                                                     diagnostic = context.getString(R.string.msg_tls_ok_ms, latency)
                                                 } catch (e: Exception) {
