@@ -331,4 +331,20 @@
     <string name="backup_select_folder">Choisis un dossier à sauvegarder.</string>
     <string name="vpn_server_hint">Adresse VPN du serveur (100.x.x.x)</string>
     <string name="server_autostart_desc">Démarrage automatique</string>
+    <string name="msg_download_complete">Fichier téléchargé : %1$s</string>
+    <string name="msg_backup_scheduled_issue">Programmation : %1$s</string>
+    <string name="msg_tls_ok_ms">TLS actif · %1$d ms</string>
+    <string name="msg_local_test_failed">Test échoué : %1$s</string>
+    <string name="msg_address_found">Adresse détectée : %1$s</string>
+    <string name="msg_backup_folders_count">%1$d dossier(s)</string>
+    <string name="msg_file_count">%1$d élément(s)</string>
+    <string name="msg_backup_not_started">Sauvegarde impossible : %1$s</string>
+    <string name="msg_app_version">Cloudix %1$s</string>
+    <string name="msg_confirm_delete_file">Supprimer %1$s ?</string>
+    <string name="vpn_address_hint">100.x.x.x</string>
+    <string name="status_selected">Sélectionné</string>
+    <string name="update_download_progress">Téléchargement : %1$d %%</string>
+    <string name="update_new_version">Build disponible : %1$s (%2$d)</string>
+    <string name="update_verified">APK vérifiée</string>
+    <string name="update_allow_install">Autorise l\'installation d’APK pour Cloudix.</string>
 </resources>

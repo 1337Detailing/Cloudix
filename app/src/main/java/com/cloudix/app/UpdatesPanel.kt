@@ -35,7 +35,7 @@ fun UpdatesPanel() {
     if (progress in 0..99) {
         LinearProgressIndicator(progress = { progress / 100f },
             modifier = Modifier.fillMaxWidth())
-        Text("Téléchargement : $progress %", style = MaterialTheme.typography.labelMedium)
+        Text(context.getString(R.string.update_download_progress, progress), style = MaterialTheme.typography.labelMedium)
     }
     FilledTonalButton(enabled = !checking, onClick = {
         scope.launch {
@@ -47,7 +47,7 @@ fun UpdatesPanel() {
                 val update = withContext(Dispatchers.IO) { CloudixUpdater.check() }
                 if (update.versionCode > CloudixUpdater.currentVersionCode(context)) {
                     candidate = update
-                    state = "Nouvelle build : ${update.title} (n° ${update.versionCode})."
+                    state = context.getString(R.string.update_new_version, update.title, update.versionCode)
                 } else state = context.getString(R.string.update_aucune_build_plus_recente)
             } catch (e: Exception) {
                 missingChannel = e.message?.contains("404") == true

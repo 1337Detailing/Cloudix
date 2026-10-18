@@ -181,7 +181,7 @@ fun CloudixApp(incoming: String) {
                         ?: throw IllegalStateException(context.getString(R.string.main_impossible_de_creer_le_fichier))
                     CloudixClient(Peer.parse(peerLink), context).download(file.path, output)
                 }
-                message = "Fichier téléchargé : ${file.name}"
+                message = context.getString(R.string.msg_download_complete, file.name)
             } catch (e: Exception) {
                 // CreateDocument allocated a brand-new URI. Remove the partial file
                 // on transfer failure instead of leaving a corrupted "successful" download.
@@ -209,7 +209,7 @@ fun CloudixApp(incoming: String) {
             // older Cloudix versions required NETWORK_CONNECTED even when
             // the user had authorized VPN/4G/5G. Keep user's folder selections.
             runCatching { BackupScheduler.schedule(context) }
-                .onFailure { backupNotice = "Programmation automatique : ${it.message}" }
+                .onFailure { backupNotice = context.getString(R.string.msg_backup_scheduled_issue, it.message.orEmpty()) }
         }
     }
     LaunchedEffect(role, peerLink, currentPath) {
@@ -312,9 +312,9 @@ fun CloudixApp(incoming: String) {
                                                         CloudixClient(Peer("127.0.0.1", 8731,
                                                             settings.secret(), TlsIdentity.fingerprint(context))).ping()
                                                     }
-                                                    diagnostic = "TLS opérationnel · $latency ms"
+                                                    diagnostic = context.getString(R.string.msg_tls_ok_ms, latency)
                                                 } catch (e: Exception) {
-                                                    diagnostic = "Échec local : ${e.message}"
+                                                    diagnostic = context.getString(R.string.msg_local_test_failed, e.message.orEmpty())
                                                 }
                                             }
                                         }) { Text(context.getString(R.string.main_tester)) }
@@ -323,7 +323,7 @@ fun CloudixApp(incoming: String) {
                                         "${CloudixSettings.localAddress() ?: "Wi-Fi indisponible"}:8731")
                                     SettingItem(Icons.Rounded.Folder, context.getString(R.string.main_dossier_partage),
                                         if (rootUri.isEmpty()) context.getString(R.string.main_aucun_dossier_selectionne)
-                                        else DocumentFile.fromTreeUri(context, Uri.parse(rootUri))?.name ?: "Sélectionné") {
+                                        else DocumentFile.fromTreeUri(context, Uri.parse(rootUri))?.name ?: context.getString(R.string.status_selected)) {
                                         TextButton(onClick = { chooseRoot.launch(null) }) { Text(context.getString(R.string.main_changer)) }
                                     }
                                     if (CloudixStatus.running.value) {
@@ -343,13 +343,13 @@ fun CloudixApp(incoming: String) {
                                         CloudixTailnet.detectOnDevice()
                                     }
                                     SettingItem(Icons.Rounded.VpnKey, context.getString(R.string.main_vpn_prive_du_serveur),
-                                        detectedTailscale?.let { "Adresse détectée : $it" }
+                                        detectedTailscale?.let { context.getString(R.string.msg_address_found, it) }
                                             ?: context.getString(R.string.main_installe_tailscale_puis_releve_l_adresse_100_))
                                     OutlinedTextField(
                                         value = tailscaleInput,
                                         onValueChange = { tailscaleInput = it.trim() },
                                         label = { Text(context.getString(R.string.main_adresse_tailscale_du_serveur)) },
-                                        placeholder = { Text("100.x.x.x") },
+                                        placeholder = { Text(context.getString(R.string.vpn_address_hint)) },
                                         supportingText = {
                                             Text(context.getString(R.string.main_ip_de_tailscale_pas_l_ip_wi_fi_laisse_vide_si))
                                         },
@@ -498,7 +498,7 @@ fun CloudixApp(incoming: String) {
                                         SettingItem(Icons.Rounded.FolderOpen, context.getString(R.string.main_explorer_les_fichiers),
                                             context.getString(R.string.main_dossiers_du_serveur)) { TextButton(onClick = { page = 1 }) { Text(context.getString(R.string.main_ouvrir)) } }
                                         SettingItem(Icons.Rounded.Backup, context.getString(R.string.main_sauvegarde_automatique),
-                                            "${settings.backupFolders.size} dossier(s) configuré(s)") {
+                                            context.getString(R.string.msg_backup_folders_count, settings.backupFolders.size)) {
                                             TextButton(onClick = { page = 2 }) { Text(context.getString(R.string.main_gerer)) }
                                         }
                                     }
@@ -523,7 +523,7 @@ fun CloudixApp(incoming: String) {
                                         Text(if (currentPath.isBlank()) context.getString(R.string.main_mes_fichiers) else currentPath,
                                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                                             style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                        Text("${files.size} éléments", style = MaterialTheme.typography.labelSmall)
+                                        Text(context.getString(R.string.msg_file_count, files.size), style = MaterialTheme.typography.labelSmall)
                                     }
                                     IconButton(onClick = { scope.launch { refresh() } }) {
                                         Icon(Icons.Rounded.Refresh, context.getString(R.string.main_actualiser))
@@ -716,7 +716,7 @@ fun CloudixApp(incoming: String) {
                                                         else context.getString(R.string.main_serveur_joignable_sauvegarde_demandee_sur_wi_)
                                                     } catch (e: Exception) {
                                                         backupNotice =
-                                                            "Sauvegarde non lancée : ${e.message ?: "connexion impossible"}"
+                                                            context.getString(R.string.msg_backup_not_started, e.message.orEmpty())
                                                     } finally {
                                                         manualBackupStarting = false
                                                     }
@@ -765,7 +765,7 @@ fun CloudixApp(incoming: String) {
                                                 LinearProgressIndicator(Modifier.fillMaxWidth())
                                             }
                                             if (working && savedNow > 0) {
-                                                Text("$savedNow fichier(s) transféré(s)",
+                                                Text(context.getString(R.string.backup_files_uploaded, savedNow),
                                                     style = MaterialTheme.typography.labelMedium,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                                             }
@@ -827,7 +827,7 @@ fun CloudixApp(incoming: String) {
                                     settings.role = ""; role = ""; page = 0
                                 }) { Text(context.getString(R.string.main_changer_le_role_de_ce_telephone)) }
                                 Spacer(Modifier.height(16.dp))
-                                Text("Cloudix ${BuildConfig.VERSION_NAME} · VPN Tailscale · Signature Android",
+                                Text(context.getString(R.string.msg_app_version, BuildConfig.VERSION_NAME),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
@@ -847,7 +847,7 @@ fun CloudixApp(incoming: String) {
                             value = clientTailscaleInput,
                             onValueChange = { clientTailscaleInput = it.trim() },
                             label = { Text(context.getString(R.string.main_ip_tailscale_du_serveur)) },
-                            placeholder = { Text("100.x.x.x") },
+                            placeholder = { Text(context.getString(R.string.vpn_address_hint)) },
                             singleLine = true
                         )
                         Text(context.getString(R.string.main_la_cle_d_appairage_et_la_verification_tls_exi),
@@ -907,7 +907,7 @@ fun CloudixApp(incoming: String) {
         pendingDelete?.let { file ->
             AlertDialog(
                 onDismissRequest = { pendingDelete = null },
-                title = { Text("Supprimer ${file.name} ?") },
+                title = { Text(context.getString(R.string.msg_confirm_delete_file, file.name)) },
                 text = { Text(context.getString(R.string.main_cette_suppression_est_definitive_sur_le_serve)) },
                 confirmButton = {
                     TextButton(onClick = {
