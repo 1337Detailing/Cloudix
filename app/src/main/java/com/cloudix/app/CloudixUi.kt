@@ -57,7 +57,7 @@ fun CloudixScaffold(
     ) else listOf(
         Triple(context.getString(R.string.common_accueil), Icons.Rounded.Home, 0),
         Triple(context.getString(R.string.common_fichiers), Icons.Rounded.FolderOpen, 1),
-        Triple("Backup", Icons.Rounded.Backup, 2),
+        Triple(context.getString(R.string.tab_backup), Icons.Rounded.Backup, 2),
         Triple(context.getString(R.string.common_themes), Icons.Rounded.Palette, 3),
         Triple(context.getString(R.string.common_reglages), Icons.Rounded.Tune, 4)
     )

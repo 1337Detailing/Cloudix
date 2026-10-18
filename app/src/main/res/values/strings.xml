@@ -311,7 +311,6 @@
     <string name="appearance_appliquer">Appliquer</string>
     <string name="update_les_nouvelles_builds_github_sont_publiees_aut">Mises à jour automatiques</string>
     <string name="update_mises_a_jour">Mises à jour</string>
-    <string name="update_canal_debug">Canal debug</string>
     <string name="update_version_installee">Version installée</string>
     <string name="update_aucune_build_plus_recente">Aucune build plus récente.</string>
     <string name="update_verification_impossible">Vérification impossible.</string>
@@ -440,4 +439,5 @@
     <string name="update_error_http">Serveur GitHub : HTTP %1$d</string>
     <string name="update_error_download_http">Téléchargement indisponible : HTTP %1$d</string>
     <string name="update_debug_build">Build de test</string>
+    <string name="tab_backup">Sauvegarde</string>
 </resources>
