@@ -804,7 +804,7 @@ fun CloudixApp(incoming: String) {
                                                 settings.serverAutoStart = it; revision++
                                             })
                                     }
-                                    Text(context.getString(R.string.main_hyperos_peut_bloquer_les_demarrages_automatiq),
+                                    Text(context.getString(R.string.background_start_permission),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     OutlinedButton(onClick = {

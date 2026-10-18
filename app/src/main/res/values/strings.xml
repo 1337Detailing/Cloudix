@@ -226,7 +226,7 @@
     <string name="main_tls_avec_certificat_epingle_et_secret_aleatoi">TLS avec certificat épinglé et secret aléatoire</string>
     <string name="main_demarrer_apres_redemarrage">Démarrer après redémarrage</string>
     <string name="main_lancer_automatiquement_le_serveur_au_demarrag">Lancer automatiquement le serveur au démarrage du serveur</string>
-    <string name="main_hyperos_peut_bloquer_les_demarrages_automatiq">HyperOS peut bloquer les démarrages automatiques : autorise Cloudix dans les paramètres d\'activité en arrière-plan.</string>
+    <string name="background_start_permission">Autorise les activités en arrière-plan si le système bloque le démarrage.</string>
     <string name="main_ancien_appairage_revoque_partage_un_nouveau_q">Ancien appairage révoqué. Partage un nouveau QR code.</string>
     <string name="main_revoquer_tous_les_clients_appaires">Révoquer tous les clients appairés</string>
     <string name="main_deconnecter_ce_serveur">Déconnecter ce serveur</string>
@@ -347,4 +347,5 @@
     <string name="update_new_version">Build disponible : %1$s (%2$d)</string>
     <string name="update_verified">APK vérifiée</string>
     <string name="update_allow_install">Autorise l\'installation d’APK pour Cloudix.</string>
+    <string name="backup_device_prefix">Appareil</string>
 </resources>

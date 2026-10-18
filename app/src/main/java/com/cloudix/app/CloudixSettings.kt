@@ -169,7 +169,7 @@ class CloudixSettings(private val context: Context) {
                 ?.let { return it }
             val suffix = ByteArray(4).also { SecureRandom().nextBytes(it) }
                 .joinToString("") { "%02x".format(it) }
-            val generated = "Appareil-$suffix"
+            val generated = "${context.getString(R.string.backup_device_prefix)}-$suffix"
             prefs.edit().putString("backup_device_name", generated)
                 .putString("backup_state", "{}").commit()
             return generated
