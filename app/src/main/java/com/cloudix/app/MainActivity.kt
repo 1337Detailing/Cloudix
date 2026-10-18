@@ -264,7 +264,7 @@ fun CloudixApp(incoming: String) {
                                     HeroCard(
                                         if (CloudixStatus.running.value) context.getString(R.string.main_serveur_en_ligne) else context.getString(R.string.main_serveur_en_veille),
                                         if (CloudixStatus.running.value)
-                                            context.getString(R.string.main_le_xiaomi_partage_ton_dossier_en_https_sur_to)
+                                            context.getString(R.string.main_le_serveur_partage_ton_dossier_en_https_sur_to)
                                         else context.getString(R.string.main_choisis_un_dossier_puis_demarre_le_partage),
                                         Icons.Rounded.Dns
                                     ) {
@@ -302,7 +302,7 @@ fun CloudixApp(incoming: String) {
                                     }
                                     SectionTitle(context.getString(R.string.main_connexion), context.getString(R.string.main_https_pin_tls))
                                     SettingItem(Icons.Rounded.HealthAndSafety, context.getString(R.string.main_diagnostic_reseau),
-                                        if (diagnostic.isBlank()) context.getString(R.string.main_verifier_tls_sur_le_xiaomi)
+                                        if (diagnostic.isBlank()) context.getString(R.string.main_verifier_tls_sur_le_serveur)
                                         else diagnostic) {
                                         TextButton(enabled = CloudixStatus.running.value, onClick = {
                                             scope.launch {
@@ -342,14 +342,14 @@ fun CloudixApp(incoming: String) {
                                     val detectedTailscale = remember(revision, CloudixStatus.running.value) {
                                         CloudixTailnet.detectOnDevice()
                                     }
-                                    SettingItem(Icons.Rounded.VpnKey, context.getString(R.string.main_vpn_prive_du_xiaomi),
+                                    SettingItem(Icons.Rounded.VpnKey, context.getString(R.string.main_vpn_prive_du_serveur),
                                         detectedTailscale?.let { "Adresse détectée : $it" }
                                             ?: context.getString(R.string.main_installe_tailscale_puis_releve_l_adresse_100_))
                                     OutlinedTextField(
                                         value = tailscaleInput,
                                         onValueChange = { tailscaleInput = it.trim() },
-                                        label = { Text(context.getString(R.string.main_adresse_tailscale_du_xiaomi)) },
-                                        placeholder = { Text("100.100.100.100") },
+                                        label = { Text(context.getString(R.string.main_adresse_tailscale_du_serveur)) },
+                                        placeholder = { Text("100.x.x.x") },
                                         supportingText = {
                                             Text(context.getString(R.string.main_ip_de_tailscale_pas_l_ip_wi_fi_laisse_vide_si))
                                         },
@@ -375,7 +375,7 @@ fun CloudixApp(incoming: String) {
                                         CloudixSettings.globalIpv6Address()
                                     }
                                     SettingItem(Icons.Rounded.Public, context.getString(R.string.main_adresse_ipv6_publique),
-                                        globalV6 ?: context.getString(R.string.main_indisponible_sur_le_wi_fi_du_xiaomi)) {
+                                        globalV6 ?: context.getString(R.string.main_indisponible_sur_le_wi_fi_du_serveur)) {
                                         IconButton(onClick = { revision++ }) {
                                             Icon(Icons.Rounded.Refresh,
                                                 contentDescription = context.getString(R.string.main_actualiser_l_adresse_ipv6))
@@ -384,7 +384,7 @@ fun CloudixApp(incoming: String) {
                                     Text(if (globalV6 == null)
                                         context.getString(R.string.main_aucune_ipv6_publique_detectee_sans_acces_a_la)
                                     else
-                                        context.getString(R.string.main_ipv6_detectee_teste_le_qr_depuis_le_vivo_en_5),
+                                        context.getString(R.string.main_ipv6_detectee_teste_le_qr_depuis_le_serveur_en_5),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         style = MaterialTheme.typography.bodySmall)
                                 } else {
@@ -392,15 +392,15 @@ fun CloudixApp(incoming: String) {
                                         when {
                                             peerLink.isBlank() -> context.getString(R.string.main_connecte_ton_serveur)
                                             connectionChecking -> context.getString(R.string.main_connexion_en_cours)
-                                            connectionVerified -> context.getString(R.string.main_xiaomi_connecte)
-                                            connectionChecked -> context.getString(R.string.main_xiaomi_inaccessible)
-                                            else -> context.getString(R.string.main_xiaomi_appaire)
+                                            connectionVerified -> context.getString(R.string.main_serveur_connecte)
+                                            connectionChecked -> context.getString(R.string.main_serveur_inaccessible)
+                                            else -> context.getString(R.string.main_serveur_appaire)
                                         },
                                         when {
-                                            peerLink.isBlank() -> context.getString(R.string.main_scanne_le_qr_code_du_xiaomi_pour_demarrer)
+                                            peerLink.isBlank() -> context.getString(R.string.main_scanne_le_qr_code_du_serveur_pour_demarrer)
                                             connectionVerified -> context.getString(R.string.main_connexion_tls_active_tes_fichiers_sont_access)
-                                            connectionChecking -> context.getString(R.string.main_verification_de_la_liaison_avec_le_xiaomi)
-                                            connectionChecked -> context.getString(R.string.main_le_xiaomi_n_est_pas_joignable_lance_le_diagno)
+                                            connectionChecking -> context.getString(R.string.main_verification_de_la_liaison_avec_le_serveur)
+                                            connectionChecked -> context.getString(R.string.main_le_serveur_n_est_pas_joignable_lance_le_diagno)
                                             else -> context.getString(R.string.main_le_serveur_est_enregistre_mais_sa_disponibili)
                                         },
                                         if (connectionVerified) Icons.Rounded.CloudDone else Icons.Rounded.CloudQueue
@@ -415,7 +415,7 @@ fun CloudixApp(incoming: String) {
                                             onScan = {
                                                 qrScanner.launch(ScanOptions()
                                                     .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                                                    .setPrompt(context.getString(R.string.main_scanne_le_code_cloudix_du_xiaomi))
+                                                    .setPrompt(context.getString(R.string.main_scanne_le_code_cloudix_du_serveur))
                                                     .setBeepEnabled(false))
                                             },
                                             onConnect = {
@@ -439,8 +439,8 @@ fun CloudixApp(incoming: String) {
                                         }
                                         if (paired != null) {
                                             SettingItem(Icons.Rounded.VpnKey, context.getString(R.string.main_vpn_tailscale_5g),
-                                                paired.tailscale?.let { "Xiaomi : $it — VPN requis sur les deux appareils" }
-                                                    ?: context.getString(R.string.main_configurer_l_ip_tailscale_100_x_du_xiaomi)) {
+                                                paired.tailscale?.let { context.getString(R.string.vpn_server_address, it) }
+                                                    ?: context.getString(R.string.main_configurer_l_ip_tailscale_100_x_du_serveur)) {
                                                 TextButton(onClick = {
                                                     clientTailscaleInput = paired.tailscale.orEmpty()
                                                     showTailscaleDialog = true
@@ -461,7 +461,7 @@ fun CloudixApp(incoming: String) {
                                         }
                                         if (paired?.globalIpv6 != null) {
                                             SettingItem(Icons.Rounded.SettingsEthernet, context.getString(R.string.main_privilegier_ipv6),
-                                                context.getString(R.string.main_utiliser_l_adresse_ipv6_meme_quand_le_vivo_es)) {
+                                                context.getString(R.string.main_utiliser_l_adresse_ipv6_meme_quand_le_serveur_es)) {
                                                 Switch(settings.preferDirectIpv6, onCheckedChange = {
                                                     settings.preferDirectIpv6 = it
                                                     revision++
@@ -701,7 +701,7 @@ fun CloudixApp(incoming: String) {
                                                     manualBackupStarting = true
                                                     backupNotice = context.getString(R.string.main_verification_de_la_connexion_securisee_au_xia)
                                                     try {
-                                                        // Distinguish a reachable Xiaomi from a queued request:
+                                                        // Verify connectivity before enqueuing the worker.
                                                         // this ping uses exactly the same peer/Tailscale route as the Worker.
                                                         withContext(Dispatchers.IO) {
                                                             CloudixClient(Peer.parse(peerLink), context,
@@ -752,7 +752,7 @@ fun CloudixApp(incoming: String) {
                                                 else context.getString(R.string.main_en_attente_du_lancement_par_android_wi_fi_4g_)
                                                 work?.state == WorkInfo.State.SUCCEEDED ->
                                                     if (savedNow == 0) context.getString(R.string.main_termine_les_fichiers_sont_deja_sauvegardes)
-                                                    else "Terminé : $savedNow fichier(s) transféré(s) au Xiaomi."
+                                                    else context.getString(R.string.backup_files_uploaded, savedNow)
                                                 work?.state == WorkInfo.State.FAILED ->
                                                     "Sauvegarde échouée : ${work.outputData.getString("error")
                                                         ?: backupError.ifBlank { context.getString(R.string.main_consulte_le_diagnostic) }}"
@@ -846,8 +846,8 @@ fun CloudixApp(incoming: String) {
                         OutlinedTextField(
                             value = clientTailscaleInput,
                             onValueChange = { clientTailscaleInput = it.trim() },
-                            label = { Text(context.getString(R.string.main_ip_tailscale_du_xiaomi)) },
-                            placeholder = { Text("100.100.100.100") },
+                            label = { Text(context.getString(R.string.main_ip_tailscale_du_serveur)) },
+                            placeholder = { Text("100.x.x.x") },
                             singleLine = true
                         )
                         Text(context.getString(R.string.main_la_cle_d_appairage_et_la_verification_tls_exi),
@@ -952,7 +952,7 @@ fun CloudixApp(incoming: String) {
 private fun PairInput(link: String, onLink: (String) -> Unit, onScan: () -> Unit, onConnect: () -> Unit) {
     ElevatedCard(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.extraLarge) {
         Column(Modifier.padding(20.dp)) {
-            SectionTitle(context.getString(R.string.main_associer_ton_xiaomi))
+            SectionTitle(context.getString(R.string.main_associer_ton_serveur))
             OutlinedTextField(link, onLink, modifier = Modifier.fillMaxWidth(),
                 label = { Text(context.getString(R.string.main_lien_cloudix)) },
                 placeholder = { Text("cloudix://pair?...") }, maxLines = 3)

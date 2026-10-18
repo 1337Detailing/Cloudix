@@ -283,7 +283,7 @@ class CloudixClient(
             (e is java.net.ConnectException || e is java.net.SocketTimeoutException ||
              e is java.net.NoRouteToHostException)) {
             return CloudixConnectionException(
-                "Connexion IPv6 directe impossible. Le Xiaomi a une adresse IPv6 publique, mais le réseau peut bloquer les connexions entrantes. Sans accès au routeur ni relais, Cloudix ne peut pas contourner ce filtrage.", e)
+                "Connexion IPv6 refusée. Vérifie le pare-feu.", e)
         }
         return CloudixNetworkFailure.describe(e)
     }
@@ -293,7 +293,7 @@ class CloudixClient(
         val caps = cm?.getNetworkCapabilities(cm.activeNetwork)
         if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true &&
             peer.globalIpv6 == null && peer.tailscale == null && peer.host.matches(Regex("(\\d{1,3}\\.){3}\\d{1,3}"))) {
-            throw CloudixConnectionException("Aucune IPv6 publique enregistrée : le réseau local du Xiaomi n'est pas joignable depuis la 5G sans relais ni accès à la box.")
+            throw CloudixConnectionException("Adresse distante indisponible. Configure un VPN.")
         }
         val ip = hostname()
         val authority = if (ip.contains(':')) "[$ip]" else ip
@@ -371,11 +371,11 @@ object CloudixNetworkFailure {
     fun describe(error: Exception): Exception {
         if (error is CloudixConnectionException) return error
         val message = when (error) {
-            is java.net.ConnectException -> "Serveur inaccessible. Vérifie que Cloudix est démarré sur le Xiaomi et que les appareils partagent le même Wi-Fi."
+            is java.net.ConnectException -> "Serveur inaccessible. Vérifie le réseau."
             is java.net.SocketTimeoutException -> "Délai dépassé. Vérifie l’adresse Wi-Fi, le pare-feu et l’isolation des appareils sur le routeur."
-            is javax.net.ssl.SSLHandshakeException -> "Échec de la connexion sécurisée TLS : ${error.message ?: "certificat ou protocole"}. Essaie le test local sur le Xiaomi et réappaire les téléphones."
-            is java.io.EOFException -> "Connexion fermée avant la réponse. Lance le diagnostic TLS sur le Xiaomi."
-            is java.net.SocketException -> "Connexion fermée par le serveur. Vérifie que les deux appareils utilisent la dernière version de Cloudix, puis lance le test TLS local sur le Xiaomi. Détail : ${error.message ?: "socket"}."
+            is javax.net.ssl.SSLHandshakeException -> "Échec TLS : ${error.message ?: "certificat"}. Associe le serveur de nouveau."
+            is java.io.EOFException -> "Connexion interrompue. Vérifie le serveur."
+            is java.net.SocketException -> "Connexion fermée : ${error.message ?: "réseau"}."
             else -> error.message ?: "Erreur de connexion inconnue"
         }
         return CloudixConnectionException(message, error)

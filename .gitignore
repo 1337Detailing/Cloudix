@@ -7,3 +7,18 @@ local.properties
 *.apk
 *.aab
 .DS_Store
+
+# Private credentials and local configuration
+*.keystore
+*.jks
+*.p12
+*.pem
+*.key
+*.mobileconfig
+*.conf
+.env
+.env.*
+*.secrets
+secrets/
+credentials/
+*.log

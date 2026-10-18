@@ -39,13 +39,13 @@ object CloudixConnectivity {
         }
         if (mobile && !ipv6 && !tailscale && peer.host.matches(Regex("(\\d{1,3}\\.){3}\\d{1,3}"))) {
             return ConnectionDiagnostic(false, "Pas de route 5G",
-                "Le QR ne contient pas d'IPv6 publique. Le réseau privé du Xiaomi est inaccessible en 5G sans relais ou ouverture du routeur.",
+                "Adresse distante indisponible.",
                 path = label)
         }
         val started = System.nanoTime()
         return try {
             client.ping()
-            ConnectionDiagnostic(true, "Xiaomi joignable",
+            ConnectionDiagnostic(true, "Serveur joignable",
                 "Connexion chiffrée TLS et authentification Cloudix vérifiées.",
                 elapsedMs(started), label)
         } catch (e: Exception) {
@@ -61,17 +61,17 @@ object CloudixConnectivity {
             val heading = when {
                 unreachable -> "Connexion réseau bloquée"
                 invalidTls -> "Erreur de connexion sécurisée"
-                else -> "Le Xiaomi n'a pas répondu"
+                else -> "Serveur sans réponse"
             }
             val explanation = when {
                 unreachable && tailscale ->
-                    "Le Xiaomi n'est pas accessible via Tailscale. Vérifie que Tailscale est connecté sur les deux téléphones et que tu utilises bien l'adresse 100.x du Xiaomi."
+                    "Serveur indisponible sur le VPN. Vérifie Tailscale."
                 unreachable && ipv6 ->
-                    "Le Xiaomi a une IPv6 publique, mais le port ${peer.port} ne répond pas depuis ce réseau. Le pare-feu de la box ou un filtrage de l'opérateur peut bloquer la connexion entrante. Sans accès au routeur ni relais, Cloudix ne peut pas contourner ce blocage."
+                    "Port ${peer.port} inaccessible. Vérifie le pare-feu réseau."
                 unreachable ->
-                    "Le Xiaomi est inaccessible sur le Wi-Fi. Vérifie que son serveur Cloudix est démarré et que les appareils partagent le même réseau."
+                    "Serveur inaccessible sur ce réseau."
                 invalidTls ->
-                    "Le certificat TLS ne correspond pas ou la négociation a échoué. Actualise le QR sur le Xiaomi et réappaire le Vivo."
+                    "Échec TLS. Associe de nouveau le serveur."
                 else -> e.message ?: "Erreur réseau inconnue. Vérifie le serveur et l'appairage."
             }
             ConnectionDiagnostic(false, heading, explanation, elapsedMs(started), label)
