@@ -1,13 +1,13 @@
-# Signature des mises à jour Cloudix — même principe que Routix
+# Signature des mises à jour Cloudix — même principe que une application Android de référence
 
-**Aucune configuration manuelle, aucun secret GitHub à créer.** Cloudix utilise la même stratégie que le workflow officiel Routix : une clé de signature debug Android générée une seule fois par GitHub Actions, conservée dans le cache `cloudix-debug-signing-v1` et restaurée pour chaque build suivante.
+**Aucune configuration manuelle, aucun secret GitHub à créer.** Cloudix utilise la même stratégie que le workflow officiel une application Android de référence : une clé de signature debug Android générée une seule fois par GitHub Actions, conservée dans le cache `cloudix-debug-signing-v1` et restaurée pour chaque build suivante.
 
 À chaque push sur `main`, la CI :
 1. réutilise la même clé de signature ;
 2. compile `app-debug.apk`, exécute tests et Android Lint ;
 3. vérifie le certificat APK et la progression du `versionCode` ;
 4. refuse de publier si l'empreinte du certificat ne correspond pas à la dernière APK publiée ;
-5. publie `cloudix-debug.apk` et `update.json` dans la release GitHub publique [debug-latest](https://github.com/1337Detailing/Cloudix/releases/tag/debug-latest).
+5. publie `cloudix-debug.apk` et `update.json` dans la release GitHub publique [debug-latest](https://github.com/<propriétaire>/<dépôt>/releases/tag/debug-latest).
 
 Cloudix télécharge la nouvelle APK, vérifie son SHA-256 **et le certificat de signature Android correspondant à l'installation actuelle**, puis ouvre l'installateur système. La validation par l'utilisateur reste obligatoire sur Android.
 
@@ -23,4 +23,5 @@ Cette approche **de bêta personnelle** évite toute configuration, mais sa clé
 
 Ne te sers pas de ce système pour une distribution publique hautement sensible ou sur Play Store. Une clé de production stockée dans un secret privé reste préférable pour cette utilisation. Le certificat APK de mise à jour est distinct de la clé TLS utilisée pour protéger les fichiers Cloudix.
 
-Pour comprendre la source de cette méthode : [workflow Routix](https://github.com/1337Detailing/Routix/blob/master/.github/workflows/build-debug-apk.yml).
+
+**Publication publique :** le cache GitHub Actions n'est pas un coffre à clés durable. Prévoir une clé de release privée et un mécanisme de rotation contrôlé avant diffusion large. Le dépôt ne contient aucune clé privée.

@@ -1,4 +1,13 @@
-/** Cloudix / site vitrine. No build step required. */
+// Optional GitHub Pages hosting: compute the repository URL from the
+// hosting account rather than shipping a personal username in source.
+const hostMatch = window.location.hostname.match(/^([a-z0-9-]+)\\.github\\.io$/i);
+if (hostMatch) {
+  const repository = 'https://github.com/' + hostMatch[1] + '/Cloudix';
+  document.querySelectorAll('a[href^="https://github.com/search?q=Cloudix"]').forEach(link => {
+    const old = link.getAttribute('href') || '';
+    link.href = repository + (old.includes('issues') ? '/issues' : '');
+  });
+}
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const touchOrSmall = window.matchMedia('(max-width: 700px)');
 const header = document.getElementById('site-header');

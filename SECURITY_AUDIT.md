@@ -2,7 +2,7 @@
 
 **Scope:** Kotlin/Compose Android APK, HTTP/HTTPS storage service, TLS pinning and pairing, SAF storage, Tailscale/IPv6 routing, WorkManager backup, GitHub update pipeline, release signing, Material You/AMOLED UI, manifests, unit tests and emulator instrumentation.
 
-**Method:** Full static review of the current GitHub source, comparison with regression tests and GitHub Actions logs; targeted fixes + new tests. **Not** a penetration test, fuzzing campaign, or a live Xiaomi↔Vivo end-to-end test. Do not interpret a green CI run as proof of perfect data durability.
+**Method:** Full static review of the current GitHub source, comparison with regression tests and GitHub Actions logs; targeted fixes + new tests. **Not** a penetration test, fuzzing campaign, or a live entre les deux appareils end-to-end test. Do not interpret a green CI run as proof of perfect data durability.
 
 ## Issues fixed during this audit
 
@@ -12,7 +12,7 @@
 | F-02 | HIGH / data integrity | `MainActivity.kt` CreateDocument flow | A failed transfer could leave an incomplete local file with the expected name. | Attempt to remove the new SAF document on failure, and show an error. |
 | F-03 | HIGH / silent omissions | `BackupWorker.kt` | The former 4,000-*scanned-item* cap could permanently skip later files while returning success. | Limit only successful uploads per batch, persist progress and retry remaining work; report a failure for too-deep folders or unknown/oversized files. |
 | F-04 | MEDIUM / concurrency | `BackupWorker.kt` | Repeated “Sauvegarder maintenant” taps could start overlapping uploads. | Unique WorkManager manual job with KEEP policy. |
-| F-05 | MEDIUM / connectivity | `CloudixTransport.kt` | Saved Tailscale address was always preferred, even when VPN disabled and the Xiaomi was reachable on local Wi-Fi. | Select the LAN peer endpoint on Wi-Fi with VPN inactive, while retaining Tailscale routing on VPN/mobile. |
+| F-05 | MEDIUM / connectivity | `CloudixTransport.kt` | Saved Tailscale address was always preferred, even when VPN disabled and the serveur was reachable on local Wi-Fi. | Select the LAN peer endpoint on Wi-Fi with VPN inactive, while retaining Tailscale routing on VPN/mobile. |
 | F-06 | MEDIUM / names | `CloudixService.kt` | Literal `%` in valid filenames was incorrectly rejected. | Allow `%` after URI query decoding; keep path-separator/traversal validation. |
 | F-07 | MEDIUM / backup collisions | `CloudixBackupNames.kt` | Unnecessary replacement of punctuation/emoji could collapse distinct filenames, with truncation collisions. | Preserve normal Unicode and punctuation, and append a stable hash to rewritten/truncated names. |
 | F-08 | MEDIUM / incorrect status | `BackupWorker.kt`, `CloudixSettings.kt`, `MainActivity.kt` | Backups could fail/partially complete without an understandable indication in the UI. | Persist a bounded error/partial status, refresh the visible backup screen, and display it. |
@@ -42,17 +42,17 @@
 | O-07 | MEDIUM | Huge directories | `DocumentFile.listFiles()` and entire JSON directory response are not paginated; very large folders can cause latency or memory pressure. | Paged listings and incremental UI loading. |
 | O-08 | MEDIUM | Backup naming | Two separate selected local trees having the same root folder name could merge in `Backups/<device>/<folder>`; sanitization now avoids illegal-character collisions but not this namespace collision. | Stable per-source directory IDs, discoverable aliases and migration. |
 | O-09 | MEDIUM | UI status | Cloudix may show a verified state from a past request although connectivity changes afterwards; a “connected” label is not a live heartbeat. | Network callbacks, live probe and clear state transitions. |
-| O-10 | MEDIUM | App restrictions | Server restart and scheduled work are subject to HyperOS/OriginOS battery policy, network/VPN availability, foreground-service restrictions and notification permissions. | Physical-device testing and documented battery/exemption setup. |
+| O-10 | MEDIUM | App restrictions | Server restart and scheduled work are subject to Android/client battery policy, network/VPN availability, foreground-service restrictions and notification permissions. | Physical-device testing and documented battery/exemption setup. |
 | O-11 | MEDIUM | Appearance | Arbitrary custom text/background colors can create inaccessible contrast even though the color editor warns users. | Optional WCAG contrast enforcement and safe-reset accessibility shortcut. |
 | O-12 | MEDIUM | VPN privacy | Tailscale's control plane and possible encrypted DERP relays are third-party services; without Tailscale or an accessible public route, direct mobile 5G is not guaranteed. | Clear setup guide, connection status and offline/LAN fallback. |
 | O-13 | MEDIUM | SAF provider behavior | Some document providers report zero/unknown sizes or modify display filenames; this can prevent transfer or produce unexpected target names. | Provider-agnostic streaming protocol, explicit actual remote filename, and test matrix across providers. |
 | O-14 | LOW | Pairing | One bearer key grants full selected-tree read/write/delete access to any paired client, until global key rotation. | Device-level access permissions and individual revocation. |
-| O-15 | LOW | Visual tests | Automated UI tests cover state propagation but not all layouts, animation durations or clipping on OriginOS notch/foldable/small-screen devices. | Screenshot/golden tests and on-device accessibility testing. |
+| O-15 | LOW | Visual tests | Automated UI tests cover state propagation but not all layouts, animation durations or clipping on client notch/foldable/small-screen devices. | Screenshot/golden tests and on-device accessibility testing. |
 
 ## Threat model and controls
 
 - Files remain in the Android SAF-selected server directory. Root permission is not required for file service.
-- Transfer traffic uses TLS; the client pins the Xiaomi certificate fingerprint and requires the random 256-bit bearer pairing secret.
+- Transfer traffic uses TLS; the client pins the serveur certificate fingerprint and requires the random 256-bit bearer pairing secret.
 - Server identity and stored pairing credentials are AES-GCM wrapped using Android Keystore keys. A compromised/rooted Android process can still access keys while the app is running.
 - Query paths reject absolute paths, `..`, slashes and backslashes inside a segment; remote root deletion is blocked.
 - Uploads are streaming, length-limited and delete newly created SAF files on failed input. Existing names are not overwritten by the normal upload endpoint.
@@ -63,11 +63,11 @@
 
 ## Mandatory physical-device acceptance tests
 
-1. On Xiaomi HyperOS + Vivo OriginOS, install the **same signed** APK, select a server directory, confirm foreground notifications and reconnect across screen-off / reboot.
+1. On serveur Android + client client, install the **same signed** APK, select a server directory, confirm foreground notifications and reconnect across screen-off / reboot.
 2. Pair on Wi-Fi. Upload & download 0-byte files, multi-gigabyte videos, a file with `%`/emoji in its name; compute SHA-256 equality on both phones.
 3. Interrupt a download halfway (disable network). Verify error shown, partial local file removed, and a retry is possible.
 4. Change the server secret. Verify former pairing is rejected and a new QR works.
-5. Activate Tailscale on both devices; switch Vivo Wi-Fi→5G→Wi-Fi, then disable Tailscale on Wi-Fi and confirm the LAN fallback.
+5. Activate Tailscale on both devices; switch client Wi-Fi→5G→Wi-Fi, then disable Tailscale on Wi-Fi and confirm the LAN fallback.
 6. Auto-backup nested source directories with 4,100+ files. Confirm every file eventually appears and incomplete status is visible.
 7. Back up two same-named source folders and an edited file; check versioning/collision risks before trusting it with irreplaceable documents.
 8. Select AMOLED, then System, then Light; customize HEX background and accent, disable animations, and verify instant update and contrast.
