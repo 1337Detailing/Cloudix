@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0A0A0A">
+  <meta name="description" content="Cloudix transforme un ancien téléphone Android en stockage personnel accessible partout avec Tailscale. Vos fichiers restent chez vous. Aucun abonnement Cloudix.">
+  <meta name="robots" content="index,follow">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="fr_FR">
+  <meta property="og:title" content="Cloudix — Ton vieux téléphone. Ton cloud.">
+  <meta property="og:description" content="Un téléphone inutilisé. Un espace de stockage personnel. Tes fichiers, chez toi.">
+  <meta property="og:image" content="https://1337detailing.github.io/Cloudix/assets/og.svg">
+  <meta property="og:url" content="https://1337detailing.github.io/Cloudix/">
+  <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+  <title>Cloudix — Ton vieux téléphone. Ton cloud.</title>
+</head>
+<body>
+  <a class="skip-link" href="#main">Aller au contenu</a>
+  <div class="page-progress" id="page-progress" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="cursor-dot" id="cursor-dot" aria-hidden="true"></div>
+  <header class="site-header" id="site-header">
+    <a class="brand" href="#haut" aria-label="Cloudix — accueil">
+      <svg class="brand-symbol" viewBox="0 0 42 42" fill="none" aria-hidden="true"><path d="M11 6h16l8 8v21H11V6Z" stroke="currentColor" stroke-width="2"/><path d="M27 6v8h8M16 23h5v-5h5v5h5v5H16v-5Z" stroke="currentColor" stroke-width="2"/></svg>
+      <span>CLOUDIX<span class="brand-period">.</span></span>
+    </a>
+    <nav class="site-nav" id="site-nav" aria-label="Navigation principale">
+      <a href="#fonctionnement">Comment ça marche</a>
+      <a href="#pourquoi">L'idée</a>
+      <a href="#compatibilite">Compatibilité</a>
+    </nav>
+    <a class="nav-github external-link" href="https://github.com/1337Detailing/Cloudix" target="_blank" rel="noopener noreferrer"><span>GITHUB</span><span class="arrow" aria-hidden="true">↗</span></a>
+    <button class="menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="site-nav" aria-label="Ouvrir le menu"><span></span><span></span></button>
+  </header>
+
+  <main id="main">
+    <section class="hero section-shell" id="haut" aria-labelledby="hero-title">
+      <div class="hero-meta mono"><span><i class="live-dot"></i> UN CLOUD QUI RESTE CHEZ TOI</span><span>01 / INTRODUCTION</span></div>
+      <div class="hero-grid">
+        <div class="hero-content">
+          <div class="eyebrow"><span class="eyebrow-line"></span> UN AUTRE USAGE DE TON TÉLÉPHONE</div>
+          <h1 id="hero-title" class="display hero-title">TON VIEUX<br>TÉLÉPHONE<span class="punctuation">.</span><br><span class="outline-word">TON CLOUD.</span></h1>
+          <p class="hero-description">Il dormait dans un tiroir. Maintenant, il garde tes fichiers. À la maison, accessibles partout.</p>
+          <div class="hero-actions"><a class="button button-primary" href="https://github.com/1337Detailing/Cloudix" target="_blank" rel="noopener noreferrer"><span>EXPLORER LE PROJET</span><span class="button-arrow" aria-hidden="true">↗</span></a><a class="text-link" href="#fonctionnement">DÉCOUVRIR <span aria-hidden="true">↓</span></a></div>
+        </div>
+        <div class="hero-art" aria-label="Représentation en trois dimensions d'un téléphone utilisé comme serveur Cloudix" role="img">
+          <div class="art-axis art-axis-x" aria-hidden="true"></div><div class="art-axis art-axis-y" aria-hidden="true"></div>
+          <div class="orbit orbit-one" aria-hidden="true"></div><div class="orbit orbit-two" aria-hidden="true"></div>
+          <div class="phone-fallback" id="phone-fallback" aria-hidden="true"><div class="fallback-speaker"></div><div class="fallback-logo">◫</div><div class="fallback-name">CLOUDIX</div><div class="fallback-status">LOCAL STORAGE<br>READY_</div></div>
+          <canvas id="phone-canvas" aria-hidden="true"></canvas>
+          <span class="art-tag art-tag-top mono">[ DEVICE / 001 ]</span><span class="art-tag art-tag-bottom mono">SELF-HOSTED<br>BY DESIGN.</span>
+          <div class="art-cross cross-a" aria-hidden="true">+</div><div class="art-cross cross-b" aria-hidden="true">+</div>
+        </div>
+      </div>
+      <div class="hero-bottom mono"><span>CONSTRUIT POUR DURER, PAS POUR DORMIR.</span><span class="scroll-cue"><span class="scroll-line"></span> SCROLL POUR EXPLORER</span></div>
+    </section>
+
+    <section class="section-shell intro-panel" id="fonctionnement" aria-labelledby="how-title">
+      <div class="section-rule"></div>
+      <div class="section-head"><div class="section-index mono">[ 02 — LE PRINCIPE ]</div><div class="section-head-main"><h2 class="section-title reveal-lines" id="how-title">UN TÉLÉPHONE.<br><span class="sand">TROIS ÉTAPES.</span></h2><p>Pas de serveur à acheter. Pas de box à configurer. Juste ce que tu possèdes déjà.</p></div></div>
+      <div class="steps">
+        <article class="step"><span class="step-number mono">01 <span>/</span> INSTALLER</span><div class="step-art art-install" aria-hidden="true"><svg viewBox="0 0 200 160" fill="none"><rect x="65" y="13" width="70" height="134" rx="8" stroke="currentColor" stroke-width="1.5"/><path d="M88 24h24" stroke="currentColor" opacity=".35"/><path class="download-dash" d="M100 52v37m-13-13 13 13 13-13M80 102h40" stroke="currentColor" stroke-width="2"/><circle cx="100" cy="134" r="2" fill="currentColor"/></svg></div><h3>Installe Cloudix.</h3><p>Ressors un ancien téléphone Android et transforme-le en espace de stockage.</p></article>
+        <article class="step"><span class="step-number mono">02 <span>/</span> CONNECTER</span><div class="step-art art-connect" aria-hidden="true"><svg viewBox="0 0 200 160" fill="none"><rect x="24" y="54" width="45" height="77" rx="5" stroke="currentColor" stroke-width="1.5"/><rect x="131" y="28" width="45" height="77" rx="5" stroke="currentColor" stroke-width="1.5"/><path class="connection-dash" d="M69 89c19-2 31-19 62-21" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 7"/><circle class="pulse-point" cx="101" cy="77" r="4" fill="currentColor"/><path d="M38 117h17m90-25h17" stroke="currentColor" opacity=".5"/></svg></div><h3>Relie Tailscale.</h3><p>Crée une connexion privée entre tes appareils, sans ouvrir de port sur ta box.</p></article>
+        <article class="step"><span class="step-number mono">03 <span>/</span> ACCÉDER</span><div class="step-art art-access" aria-hidden="true"><svg viewBox="0 0 200 160" fill="none"><path d="M42 57h116v77H42z" stroke="currentColor" stroke-width="1.5"/><path d="M42 76h116M55 66h5m7 0h5m7 0h5" stroke="currentColor" stroke-width="1.5"/><path class="folder-lift" d="M69 99h22l7 7h33v19H69V99Z" stroke="currentColor" stroke-width="1.5"/><path d="M101 42v43m-10-11 10 11 10-11" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 4"/></svg></div><h3>Retrouve tes fichiers.</h3><p>Depuis ton autre téléphone ou ton ordinateur, où que tu sois connecté.</p></article>
+      </div>
+    </section>
+
+    <section class="section-shell philosophy" id="pourquoi" aria-labelledby="why-title"><div class="section-rule"></div>
+      <div class="philosophy-grid"><div class="philosophy-aside"><span class="section-index mono">[ 03 — POURQUOI CLOUDIX ]</span><h2 id="why-title" class="section-title reveal-lines">TON CLOUD<br><span class="sand">T'APPARTIENT.</span></h2><div class="diagram" aria-hidden="true"><span class="diagram-label mono">TON RÉSEAU PRIVÉ</span><div class="diagram-line"></div><div class="diagram-device diagram-phone"><span class="diag-symbol">▣</span><small>STOCKAGE</small></div><div class="diagram-center">·······<span>TAILSCALE</span>·······</div><div class="diagram-device diagram-laptop"><span class="diag-symbol">▤</span><small>ACCÈS</small></div><div class="diagram-bottom mono">AUCUN CLOUD CENTRAL OBLIGATOIRE</div></div></div>
+      <div class="benefits"><article class="benefit"><span class="benefit-num mono">01 /</span><div><h3>Chez toi. Point.</h3><p>Tes fichiers sont stockés sur ton propre appareil. Pas sur un espace cloud loué.</p></div><span class="benefit-symbol" aria-hidden="true">⌁</span></article><article class="benefit"><span class="benefit-num mono">02 /</span><div><h3>Sans abonnement Cloudix.</h3><p>Pas de forfait mensuel pour utiliser ton propre stockage.</p></div><span class="benefit-symbol" aria-hidden="true">⊘</span></article><article class="benefit"><span class="benefit-num mono">03 /</span><div><h3>Une seconde vie.</h3><p>Un appareil qui prend la poussière peut encore servir, tous les jours.</p></div><span class="benefit-symbol" aria-hidden="true">↺</span></article><article class="benefit"><span class="benefit-num mono">04 /</span><div><h3>Un accès privé.</h3><p>Tailscale relie tes appareils via un réseau chiffré. Tu gardes le contrôle des accès.</p></div><span class="benefit-symbol" aria-hidden="true">⌘</span></article></div></div>
+    </section>
+
+    <section class="section-shell specs" id="compatibilite" aria-labelledby="specs-title"><div class="section-rule"></div><div class="specs-header"><span class="section-index mono">[ 04 — L'ESSENTIEL ]</span><h2 class="section-title" id="specs-title">MOINS DE<br><span class="sand">COMPLICATIONS.</span></h2></div><div class="specs-grid"><div class="spec"><span class="spec-kicker mono">APPAREIL SERVEUR</span><strong>ANDROID<span class="spec-star">*</span></strong><p>Un téléphone disponible, branché et connecté.</p></div><div class="spec"><span class="spec-kicker mono">ACCÈS À DISTANCE</span><strong>PRIVÉ.</strong><p>Avec Tailscale, sur ton réseau personnel.</p></div><div class="spec"><span class="spec-kicker mono">COÛT CLOUDIX</span><strong>0 €</strong><p>Aucun abonnement Cloudix. Ton matériel, ton stockage.</p></div></div><p class="spec-footnote mono">* LA COMPATIBILITÉ DÉPEND DE LA VERSION ANDROID ET DES FONCTIONNALITÉS DE L'APPAREIL.</p></section>
+
+    <section class="section-shell final-section" id="telecharger" aria-labelledby="final-title"><div class="section-rule"></div><div class="final-inner"><span class="section-index mono">[ 05 — À TOI DE JOUER ]</span><div class="final-body"><h2 id="final-title" class="final-title">IL EST TEMPS<br>DE LE <span>RALLUMER.</span></h2><div class="final-aside"><p>Un vieux téléphone peut encore rendre de vrais services. Donne-lui une nouvelle mission.</p><a class="button button-sand" href="https://github.com/1337Detailing/Cloudix/releases" target="_blank" rel="noopener noreferrer"><span>VOIR LES TÉLÉCHARGEMENTS</span><span class="button-arrow" aria-hidden="true">↗</span></a><a class="under-link" href="https://github.com/1337Detailing/Cloudix" target="_blank" rel="noopener noreferrer">Parcourir le code source <span aria-hidden="true">↗</span></a></div></div></div></section>
+  </main>
+  <footer class="site-footer section-shell"><a class="footer-brand" href="#haut">CLOUDIX<span>.</span></a><div class="footer-center mono">BUILD YOUR OWN CLOUD.<br>KEEP WHAT MATTERS.</div><div class="footer-links"><a href="https://github.com/1337Detailing/Cloudix" target="_blank" rel="noopener noreferrer">GITHUB ↗</a><a href="./LICENSE">LICENCE DU SITE ↗</a><a href="https://github.com/1337Detailing/Cloudix/issues/new" target="_blank" rel="noopener noreferrer">CONTACT ↗</a></div><div class="footer-bottom mono"><span>© <span id="year">2026</span> CLOUDIX</span><span>FAIT POUR LES APPAREILS QUI ONT ENCORE À DONNER.</span><a href="#haut">REMONTER ↑</a></div></footer>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/lenis@1.1.20/dist/lenis.min.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
