@@ -22,13 +22,13 @@ data class CloudixUpdateInfo(
     val url: String,
     val title: String
 ) {
-    fun validate() {
-        require(versionCode in 1..Int.MAX_VALUE.toLong()) { "Version invalide" }
-        require(sha256.matches(Regex("[a-f0-9]{64}"))) { "Empreinte SHA-256 absente ou invalide" }
+    fun validate(context: Context? = null) {
+        require(versionCode in 1..Int.MAX_VALUE.toLong()) { context?.getString(R.string.update_error_version) ?: "" }
+        require(sha256.matches(Regex("[a-f0-9]{64}"))) { context?.getString(R.string.update_error_digest) ?: "" }
         require(BuildConfig.UPDATE_REPOSITORY.isNotBlank() && url == CloudixUpdater.APK_URL) {
-            "Adresse de téléchargement non autorisée"
+            context?.getString(R.string.update_error_url) ?: ""
         }
-        require(title.length <= 160) { "Notes de version trop longues" }
+        require(title.length <= 160) { context?.getString(R.string.update_error_title) ?: "" }
     }
 }
 
@@ -57,19 +57,18 @@ object CloudixUpdater {
         }
     }
 
-    fun check(): CloudixUpdateInfo {
-        require(BuildConfig.UPDATE_REPOSITORY.isNotBlank()) { "Canal de mise à jour non configuré" }
+    fun check(context: Context): CloudixUpdateInfo {
+        require(BuildConfig.UPDATE_REPOSITORY.isNotBlank()) { context.getString(R.string.update_error_no_channel) }
         val conn = open(CHECK_URL)
         try {
             if (conn.responseCode != 200)
                 throw IOException(
                     if (conn.responseCode == 404)
-                        "La première APK de mise à jour n'est pas encore publiée sur GitHub (404). " +
-                        "Réessaie après la prochaine compilation Cloudix réussie."
-                    else "Vérification GitHub impossible (HTTP ${conn.responseCode})."
+                        context.getString(R.string.update_error_not_published)
+                    else context.getString(R.string.update_error_http, conn.responseCode)
                 )
             val length = conn.contentLengthLong
-            require(length in -1..16_384) { "Métadonnées de mise à jour trop volumineuses" }
+            require(length in -1..16_384) { context.getString(R.string.update_error_metadata_large) }
             val data = conn.inputStream.use { stream ->
                 val buffer = java.io.ByteArrayOutputStream()
                 val chunk = ByteArray(2048)
@@ -77,13 +76,13 @@ object CloudixUpdater {
                     val count = stream.read(chunk)
                     if (count < 0) break
                     buffer.write(chunk, 0, count)
-                    require(buffer.size() <= 16_384) { "Réponse GitHub trop volumineuse" }
+                    require(buffer.size() <= 16_384) { context.getString(R.string.update_error_response_large) }
                 }
                 JSONObject(buffer.toString("UTF-8"))
             }
             return CloudixUpdateInfo(data.getLong("versionCode"),
-                data.getString("sha256"), data.getString("url"), data.optString("title", "Build debug")).also {
-                it.validate()
+                data.getString("sha256"), data.getString("url"), data.optString("title", context.getString(R.string.update_debug_build))).also {
+                it.validate(context)
             }
         } finally { conn.disconnect() }
     }
@@ -101,31 +100,31 @@ object CloudixUpdater {
         val flags = if (Build.VERSION.SDK_INT >= 28)
             PackageManager.GET_SIGNING_CERTIFICATES else PackageManager.GET_SIGNATURES
         val apk = pm.getPackageArchiveInfo(file.absolutePath, flags)
-            ?: throw SecurityException("APK non reconnue par Android")
+            ?: throw SecurityException(context.getString(R.string.update_error_invalid_apk))
         val current = pm.getPackageInfo(context.packageName, flags)
-        require(apk.packageName == context.packageName) { "Nom de package différent de Cloudix" }
+        require(apk.packageName == context.packageName) { context.getString(R.string.update_error_package) }
         val code = if (Build.VERSION.SDK_INT >= 28) apk.longVersionCode else apk.versionCode.toLong()
         require(code == expected.versionCode && code > currentVersionCode(context)) {
-            "Cette APK n'est pas une version plus récente."
+            context.getString(R.string.update_error_outdated)
         }
         val originalCerts = signers(current).map { CloudixSettings.fingerprint(it) }.toSet()
         val updatedCerts = signers(apk).map { CloudixSettings.fingerprint(it) }.toSet()
         if (originalCerts.isEmpty() || originalCerts != updatedCerts) {
-            throw SecurityException("Signature Android différente. Impossible de mettre à jour cette APK sans réinstallation : utilise une clé de signature stable.")
+            throw SecurityException(context.getString(R.string.update_error_signature))
         }
     }
 
     fun download(context: Context, info: CloudixUpdateInfo, onProgress: (Int) -> Unit): File {
-        info.validate()
-        require(info.versionCode > currentVersionCode(context)) { "Cloudix est déjà à jour." }
+        info.validate(context)
+        require(info.versionCode > currentVersionCode(context)) { context.getString(R.string.update_error_current) }
         val outputDir = File(context.cacheDir, "updates").also { it.mkdirs() }
         val target = File(outputDir, "cloudix-update.apk")
         target.delete()
         val conn = open(info.url)
         try {
-            if (conn.responseCode != 200) throw IOException("APK signée indisponible sur GitHub Releases (HTTP ${conn.responseCode}).")
+            if (conn.responseCode != 200) throw IOException(context.getString(R.string.update_error_download_http, conn.responseCode))
             val total = conn.contentLengthLong
-            require(total in -1..MAX_APK_BYTES) { "APK trop volumineuse" }
+            require(total in -1..MAX_APK_BYTES) { context.getString(R.string.update_error_apk_large) }
             val digest = MessageDigest.getInstance("SHA-256")
             var readTotal = 0L
             conn.inputStream.use { input ->
@@ -135,7 +134,7 @@ object CloudixUpdater {
                         val n = input.read(bytes)
                         if (n < 0) break
                         readTotal += n
-                        if (readTotal > MAX_APK_BYTES) throw IOException("APK dépasse la limite de taille")
+                        if (readTotal > MAX_APK_BYTES) throw IOException(context.getString(R.string.update_error_apk_too_large))
                         digest.update(bytes, 0, n)
                         output.write(bytes, 0, n)
                         if (total > 0) onProgress(((readTotal * 100) / total).toInt().coerceIn(0, 100))
@@ -143,10 +142,10 @@ object CloudixUpdater {
                     output.fd.sync()
                 }
             }
-            if (total >= 0 && readTotal != total) throw IOException("Téléchargement incomplet")
+            if (total >= 0 && readTotal != total) throw IOException(context.getString(R.string.update_error_incomplete))
             val actual = digest.digest().joinToString("") { "%02x".format(it) }
             if (!MessageDigest.isEqual(actual.toByteArray(), info.sha256.toByteArray()))
-                throw SecurityException("SHA-256 incorrecte : fichier rejeté")
+                throw SecurityException(context.getString(R.string.update_error_sha))
             verifyApk(context, target, info)
             onProgress(100)
             return target
@@ -161,7 +160,7 @@ object CloudixUpdater {
      * User must grant permission to install packages from Cloudix.
      */
     fun install(context: Context, apk: File): Boolean {
-        require(apk.isFile && apk.parentFile?.name == "updates") { "Fichier APK inconnu" }
+        require(apk.isFile && apk.parentFile?.name == "updates") { context.getString(R.string.update_error_unknown) }
         if (Build.VERSION.SDK_INT >= 26 && !context.packageManager.canRequestPackageInstalls()) {
             context.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                 Uri.parse("package:${context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))

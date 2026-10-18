@@ -44,7 +44,7 @@ fun UpdatesPanel() {
             downloaded = null
             missingChannel = false
             try {
-                val update = withContext(Dispatchers.IO) { CloudixUpdater.check() }
+                val update = withContext(Dispatchers.IO) { CloudixUpdater.check(context) }
                 if (update.versionCode > CloudixUpdater.currentVersionCode(context)) {
                     candidate = update
                     state = context.getString(R.string.update_new_version, update.title, update.versionCode)

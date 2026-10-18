@@ -419,4 +419,25 @@
     <string name="err_tls">Connexion sécurisée refusée.</string>
     <string name="err_socket">Connexion fermée.</string>
     <string name="err_http">Erreur serveur HTTP %1$d.</string>
+    <string name="update_error_version">Version invalide</string>
+    <string name="update_error_digest">Empreinte SHA-256 absente ou invalide</string>
+    <string name="update_error_url">Adresse de téléchargement non autorisée</string>
+    <string name="update_error_title">Notes de version trop longues</string>
+    <string name="update_error_no_channel">Canal de mise à jour non configuré</string>
+    <string name="update_error_metadata_large">Métadonnées de mise à jour trop volumineuses</string>
+    <string name="update_error_response_large">Réponse GitHub trop volumineuse</string>
+    <string name="update_error_invalid_apk">APK non reconnue par Android</string>
+    <string name="update_error_package">Nom de package différent de Cloudix</string>
+    <string name="update_error_outdated">Cette APK n\'est pas une version plus récente.</string>
+    <string name="update_error_signature">Signature Android différente. Impossible de mettre à jour cette APK sans réinstallation : utilise une clé de signature stable.</string>
+    <string name="update_error_current">Cloudix est déjà à jour.</string>
+    <string name="update_error_apk_large">APK trop volumineuse</string>
+    <string name="update_error_apk_too_large">APK dépasse la limite de taille</string>
+    <string name="update_error_incomplete">Téléchargement incomplet</string>
+    <string name="update_error_sha">SHA-256 incorrecte : fichier rejeté</string>
+    <string name="update_error_unknown">Fichier APK inconnu</string>
+    <string name="update_error_not_published">Mise à jour indisponible. Réessaie plus tard.</string>
+    <string name="update_error_http">Serveur GitHub : HTTP %1$d</string>
+    <string name="update_error_download_http">Téléchargement indisponible : HTTP %1$d</string>
+    <string name="update_debug_build">Build de test</string>
 </resources>
