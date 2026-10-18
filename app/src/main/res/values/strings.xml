@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Cloudix</string>
+    <string name="backup_invalid_device_name">Nom d\'appareil invalide</string>
+    <string name="backup_connecting_server">Connexion au serveur…</string>
+</resources>

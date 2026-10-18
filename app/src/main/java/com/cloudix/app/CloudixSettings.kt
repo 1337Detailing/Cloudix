@@ -156,6 +156,37 @@ class CloudixSettings(private val context: Context) {
             observedWifiOnly = value
             prefs.edit().putBoolean("wifi_only", value).apply()
         }
+    /**
+     * Neutral, stable server folder name for this Cloudix installation.
+     * The random suffix is not the device model, hardware ID or user account.
+     * When creating/migrating a name, invalidate the per-file incremental index:
+     * paths on the server changed and must be uploaded again. Old server files
+     * are never deleted.
+     */
+    var backupDeviceName: String
+        get() {
+            prefs.getString("backup_device_name", null)?.takeIf { it.isNotBlank() }
+                ?.let { return it }
+            val suffix = ByteArray(4).also { SecureRandom().nextBytes(it) }
+                .joinToString("") { "%02x".format(it) }
+            val generated = "Appareil-$suffix"
+            prefs.edit().putString("backup_device_name", generated)
+                .putString("backup_state", "{}").commit()
+            return generated
+        }
+        set(value) {
+            val clean = value.trim()
+            require(clean.isNotBlank() && clean.length <= 60 &&
+                clean != "." && clean != ".." &&
+                clean.none { it == '/' || it == '\\' || it.code < 32 }) {
+                context.getString(R.string.backup_invalid_device_name)
+            }
+            if (backupDeviceName != clean) {
+                prefs.edit().putString("backup_device_name", clean)
+                    .putString("backup_state", "{}").commit()
+            }
+        }
+
     var lastManualBackupId: String
         get() = prefs.getString("backup_last_manual_id", "") ?: ""
         set(value) = prefs.edit().putString("backup_last_manual_id", value).apply()

@@ -2,7 +2,6 @@ package com.cloudix.app
 
 import android.content.Context
 import android.net.Uri
-import android.os.Build
 import androidx.documentfile.provider.DocumentFile
 import androidx.work.Constraints
 import androidx.work.Data
@@ -81,14 +80,14 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         return try {
             settings.lastBackupError = ""
             settings.lastBackupItems = 0
-            setProgress(workDataOf("phase" to "Connexion au Xiaomi...", "uploaded" to 0))
+            setProgress(workDataOf("phase" to applicationContext.getString(R.string.backup_connecting_server), "uploaded" to 0))
             val client = CloudixClient(Peer.parse(settings.peer), applicationContext)
             // Verify the actual route from inside the Worker, not only the UI.
             // Tailscale is available to workers through Android's VPN network stack.
             client.ping()
             setProgress(workDataOf("phase" to "Analyse des dossiers...", "uploaded" to 0))
             val state = settings.backupState()
-            val device = safeName(Build.MODEL.ifBlank { "Android" })
+            val device = safeName(settings.backupDeviceName)
             ensure(client, "", "Backups")
             ensure(client, "Backups", device)
             var uploaded = 0
