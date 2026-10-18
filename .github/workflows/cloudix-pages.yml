@@ -1,4 +1,4 @@
-name: Cloudix Website / GitHub Pages
+name: Cloudix Website / Validation
 
 on:
   push:
@@ -10,28 +10,29 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: cloudix-pages
-  cancel-in-progress: true
 
 jobs:
-  deploy:
+  validate:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-      - name: Upload static website
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: website
-      - name: Deploy GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Verify JavaScript syntax
+        run: node --check website/app.js
+      - name: Verify static site
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from html.parser import HTMLParser
+          import xml.etree.ElementTree as ET
+          root = Path('website')
+          page = (root / 'index.html').read_text(encoding='utf-8')
+          for file in ('styles.css', 'app.js', 'assets/favicon.svg', 'assets/og.svg', 'LICENSE'):
+              assert (root / file).is_file(), file
+          for section in ('fonctionnement','pourquoi','compatibilite','telecharger'):
+              assert f'id="{section}"' in page, section
+          HTMLParser().feed(page)
+          ET.parse(root / 'assets/favicon.svg')
+          ET.parse(root / 'assets/og.svg')
+          print('Cloudix website static checks passed')
+          PY
