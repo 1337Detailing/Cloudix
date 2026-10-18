@@ -245,14 +245,14 @@ data class RemoteFile(
 )
 class CloudixClient(
     val peer: Peer,
-    private val context: Context? = null,
+    private val context: Context,
     private val connectTimeoutMs: Int = 12_000,
     private val readTimeoutMs: Int = 60_000
 ) {
     private fun preferIpv6(): Boolean {
         if (peer.globalIpv6 == null) return false
         if (context != null && CloudixSettings(context).preferDirectIpv6) return true
-        val cm = context?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
             ?: return false
         val capabilities = cm.getNetworkCapabilities(cm.activeNetwork)
         return capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true
@@ -261,7 +261,7 @@ class CloudixClient(
     // The VPN route is stable across Wi-Fi/5G and avoids a blocked home IPv6 firewall.
     fun selectedAddress(): String {
         if (peer.tailscale == null) return peer.endpoints(preferIpv6()).first()
-        val cm = context?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
         val capabilities = cm?.getNetworkCapabilities(cm.activeNetwork)
         val vpnActive = capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
         val wifiActive = capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
@@ -277,23 +277,23 @@ class CloudixClient(
             (e is java.net.ConnectException || e is java.net.SocketTimeoutException ||
              e is java.net.NoRouteToHostException)) {
             return CloudixConnectionException(
-                "Tailscale ne répond pas. Active le VPN Tailscale sur les deux téléphones, vérifie qu'ils sont sur le même compte, puis relance le test.", e)
+                context.getString(R.string.err_vpn_connection), e)
         }
         if (preferIpv6() && peer.globalIpv6 != null &&
             (e is java.net.ConnectException || e is java.net.SocketTimeoutException ||
              e is java.net.NoRouteToHostException)) {
             return CloudixConnectionException(
-                "Connexion IPv6 refusée. Vérifie le pare-feu.", e)
+                context.getString(R.string.err_ipv6_blocked), e)
         }
-        return CloudixNetworkFailure.describe(e)
+        return CloudixNetworkFailure.describe(e, context)
     }
 
     private fun connection(route: String, method: String = "GET"): HttpsURLConnection {
-        val cm = context?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
         val caps = cm?.getNetworkCapabilities(cm.activeNetwork)
         if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true &&
             peer.globalIpv6 == null && peer.tailscale == null && peer.host.matches(Regex("(\\d{1,3}\\.){3}\\d{1,3}"))) {
-            throw CloudixConnectionException("Adresse distante indisponible. Configure un VPN.")
+            throw CloudixConnectionException(context.getString(R.string.err_remote_address))
         }
         val ip = hostname()
         val authority = if (ip.contains(':')) "[$ip]" else ip
@@ -312,7 +312,7 @@ class CloudixClient(
     private fun request(route: String, method: String = "GET"): String {
         val conn = connection(route, method)
         try {
-            if (conn.responseCode !in 200..299) throw CloudixNetworkFailure.http(conn.responseCode, conn.errorStream)
+            if (conn.responseCode !in 200..299) throw CloudixNetworkFailure.http(conn.responseCode, conn.errorStream, context)
             return conn.inputStream.bufferedReader().use { it.readText() }
         } catch (e: Exception) { throw describeFailure(e) }
         finally { conn.disconnect() }
@@ -347,14 +347,14 @@ class CloudixClient(
             conn.setRequestProperty("Content-Type", "application/octet-stream")
             conn.setFixedLengthStreamingMode(length)
             conn.outputStream.use { out -> source.use { copyExactly(it, out, length) } }
-            if (conn.responseCode !in 200..299) throw CloudixNetworkFailure.http(conn.responseCode, conn.errorStream)
+            if (conn.responseCode !in 200..299) throw CloudixNetworkFailure.http(conn.responseCode, conn.errorStream, context)
         } catch (e: Exception) { throw describeFailure(e) }
         finally { conn.disconnect() }
     }
     fun download(path: String, sink: OutputStream) {
         val conn = connection("/api/file?path=${Uri.encode(path)}")
         try {
-            if (conn.responseCode != 200) throw CloudixNetworkFailure.http(conn.responseCode, conn.errorStream)
+            if (conn.responseCode != 200) throw CloudixNetworkFailure.http(conn.responseCode, conn.errorStream, context)
             // Never report a truncated response as a successful downloaded file.
             val expectedLength = conn.contentLengthLong
             conn.inputStream.use { input ->
@@ -368,21 +368,21 @@ class CloudixClient(
     }
 }
 object CloudixNetworkFailure {
-    fun describe(error: Exception): Exception {
+    fun describe(error: Exception, context: Context): Exception {
         if (error is CloudixConnectionException) return error
         val message = when (error) {
-            is java.net.ConnectException -> "Serveur inaccessible. Vérifie le réseau."
-            is java.net.SocketTimeoutException -> "Délai dépassé. Vérifie l’adresse Wi-Fi, le pare-feu et l’isolation des appareils sur le routeur."
-            is javax.net.ssl.SSLHandshakeException -> "Échec TLS : ${error.message ?: "certificat"}. Associe le serveur de nouveau."
-            is java.io.EOFException -> "Connexion interrompue. Vérifie le serveur."
-            is java.net.SocketException -> "Connexion fermée : ${error.message ?: "réseau"}."
-            else -> error.message ?: "Erreur de connexion inconnue"
+            is java.net.ConnectException -> context.getString(R.string.err_server_offline)
+            is java.net.SocketTimeoutException -> context.getString(R.string.err_timeout)
+            is javax.net.ssl.SSLHandshakeException -> context.getString(R.string.err_tls)
+            is java.io.EOFException -> context.getString(R.string.err_dropped)
+            is java.net.SocketException -> context.getString(R.string.err_socket)
+            else -> error.message ?: context.getString(R.string.err_unknown)
         }
         return CloudixConnectionException(message, error)
     }
-    fun http(code: Int, stream: InputStream?): Exception {
+    fun http(code: Int, stream: InputStream?, context: Context): Exception {
         val response = try { stream?.bufferedReader()?.use { it.readText().take(300) } } catch (_: Exception) { null }
-        return CloudixConnectionException("Serveur HTTP $code : ${response ?: "requête refusée"}")
+        return CloudixConnectionException(context.getString(R.string.err_http, code))
     }
 }
 class CloudixConnectionException(message: String, cause: Throwable? = null): IOException(message, cause)

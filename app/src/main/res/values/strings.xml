@@ -415,4 +415,15 @@
     <string name="backup_partial">Sauvegarde partielle : %1$d fichiers</string>
     <string name="backup_failed">Sauvegarde échouée : %1$s</string>
     <string name="backup_incomplete">Sauvegarde incomplète. Vérifie les dossiers.</string>
+    <string name="err_vpn_connection">VPN indisponible. Vérifie Tailscale.</string>
+    <string name="err_ipv6_blocked">Connexion IPv6 bloquée.</string>
+    <string name="err_remote_address">Adresse distante indisponible.</string>
+    <string name="err_server_offline">Serveur inaccessible.</string>
+    <string name="err_timeout">Connexion expirée.</string>
+    <string name="err_dropped">Connexion interrompue.</string>
+    <string name="err_unknown">Connexion impossible.</string>
+    <string name="err_incomplete_file">Fichier incomplet</string>
+    <string name="err_tls">Connexion sécurisée refusée.</string>
+    <string name="err_socket">Connexion fermée.</string>
+    <string name="err_http">Erreur serveur HTTP %1$d.</string>
 </resources>
