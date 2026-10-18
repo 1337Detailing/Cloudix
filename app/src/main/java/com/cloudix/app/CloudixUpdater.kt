@@ -25,7 +25,7 @@ data class CloudixUpdateInfo(
     fun validate() {
         require(versionCode in 1..Int.MAX_VALUE.toLong()) { "Version invalide" }
         require(sha256.matches(Regex("[a-f0-9]{64}"))) { "Empreinte SHA-256 absente ou invalide" }
-        require(url == "https://github.com/1337Detailing/Cloudix/releases/download/debug-latest/cloudix-debug.apk") {
+        require(BuildConfig.UPDATE_REPOSITORY.isNotBlank() && url == CloudixUpdater.APK_URL) {
             "Adresse de téléchargement non autorisée"
         }
         require(title.length <= 160) { "Notes de version trop longues" }
@@ -33,7 +33,10 @@ data class CloudixUpdateInfo(
 }
 
 object CloudixUpdater {
-    const val CHECK_URL = "https://github.com/1337Detailing/Cloudix/releases/download/debug-latest/update.json"
+    val CHECK_URL: String
+        get() = "https://github.com/${BuildConfig.UPDATE_REPOSITORY}/releases/download/debug-latest/update.json"
+    val APK_URL: String
+        get() = "https://github.com/${BuildConfig.UPDATE_REPOSITORY}/releases/download/debug-latest/cloudix-debug.apk"
     private const val MAX_APK_BYTES = 150L * 1024 * 1024
     fun currentVersionCode(context: Context): Long {
         val info = context.packageManager.getPackageInfo(context.packageName, 0)
@@ -55,6 +58,7 @@ object CloudixUpdater {
     }
 
     fun check(): CloudixUpdateInfo {
+        require(BuildConfig.UPDATE_REPOSITORY.isNotBlank()) { "Canal de mise à jour non configuré" }
         val conn = open(CHECK_URL)
         try {
             if (conn.responseCode != 200)

@@ -62,7 +62,7 @@ fun UpdatesPanel() {
     }
     if (missingChannel) {
         OutlinedButton(onClick = {
-            uriHandler.openUri("https://github.com/1337Detailing/Cloudix/actions/workflows/android.yml")
+            uriHandler.openUri("https://github.com/${BuildConfig.UPDATE_REPOSITORY}/actions/workflows/android.yml")
         }) {
             Icon(Icons.Rounded.Info, null)
             Spacer(Modifier.width(8.dp))

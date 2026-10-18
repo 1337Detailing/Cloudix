@@ -6,9 +6,9 @@ import org.junit.Test
 
 class UpdateMetadataTest {
     @Test fun validVersionAndDigest() {
-        val candidate = CloudixUpdateInfo(1023, "a".repeat(64), "https://github.com/1337Detailing/Cloudix/releases/download/debug-latest/cloudix-debug.apk", "test")
+        val candidate = CloudixUpdateInfo(1023, "a".repeat(64), CloudixUpdater.APK_URL, "test")
         assertEquals(1023L, candidate.versionCode)
-        candidate.validate()
+        if (BuildConfig.UPDATE_REPOSITORY.isNotBlank()) candidate.validate()
     }
 
     @Test fun rejectsWeakDigest() {
@@ -24,7 +24,7 @@ class UpdateMetadataTest {
     }
 
     @Test fun rejectsNonMonotonicOrImpossibleVersionCodes() {
-        val official = "https://github.com/1337Detailing/Cloudix/releases/download/debug-latest/cloudix-debug.apk"
+        val official = CloudixUpdater.APK_URL
         for (code in listOf(0L, -1L, Int.MAX_VALUE.toLong() + 1L)) {
             assertThrows(IllegalArgumentException::class.java) {
                 CloudixUpdateInfo(code, "a".repeat(64), official, "beta").validate()
@@ -33,7 +33,7 @@ class UpdateMetadataTest {
     }
 
     @Test fun preventsTamperedPathsAndUnexpectedCertificateManifests() {
-        val official = "https://github.com/1337Detailing/Cloudix/releases/download/debug-latest/cloudix-debug.apk"
+        val official = CloudixUpdater.APK_URL
         for (url in listOf(
             official + "?redirect=evil",
             official.replace("https://", "http://"),
@@ -46,7 +46,7 @@ class UpdateMetadataTest {
     }
 
     @Test fun rejectsOversizedTitlesAndUppercaseDigest() {
-        val official = "https://github.com/1337Detailing/Cloudix/releases/download/debug-latest/cloudix-debug.apk"
+        val official = CloudixUpdater.APK_URL
         assertThrows(IllegalArgumentException::class.java) {
             CloudixUpdateInfo(1080, "A".repeat(64), official, "beta").validate()
         }

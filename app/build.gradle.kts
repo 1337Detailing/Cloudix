@@ -10,15 +10,18 @@ android {
     compileSdk = 35
     defaultConfig {
         applicationId = "com.cloudix.app"
+        // Repository is provided by the CI environment, not tied to a personal account.
+        val updateRepo = System.getenv("GITHUB_REPOSITORY") ?: ""
+        buildConfigField("String", "UPDATE_REPOSITORY", "\"$updateRepo\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         minSdk = 26
         targetSdk = 35
         // Monotonically increasing versionCode prevents update downgrades.
         versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()?.let { 1000 + it } ?: 2
-        versionName = "0.5.3"
+        versionName = "0.6.0"
     }
     signingConfigs {
-        // Debug signing identity reused across CI builds, like Routix.
+        // CI restores the same signing identity across updates.
         getByName("debug") {
             if (ciDebugKeystore) {
                 storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")

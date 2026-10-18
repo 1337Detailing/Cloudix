@@ -39,7 +39,7 @@ jobs:
               echo "::error::Previous Cloudix release exists but original signing key is missing. Stop to prevent an incompatible Android update."
               exit 1
             fi
-            # The same approach as Routix. Future workflows restore this exact key.
+            # Subsequent builds must restore this signing identity.
             keytool -genkeypair -keystore "$HOME/.android/debug.keystore" \
               -storepass android -alias androiddebugkey -keypass android \
               -keyalg RSA -keysize 3072 -validity 12000 \
@@ -105,8 +105,9 @@ jobs:
           cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/cloudix-debug.apk"
           DIGEST="$(sha256sum "$RUNNER_TEMP/cloudix-debug.apk" | cut -d' ' -f1)"
           VERSION_CODE="$((1000 + GITHUB_RUN_NUMBER))"
-          printf '{"versionCode":%d,"sha256":"%s","url":"https://github.com/1337Detailing/Cloudix/releases/download/debug-latest/cloudix-debug.apk","title":"Build debug #%s"}\n' \
-            "$VERSION_CODE" "$DIGEST" "$GITHUB_RUN_NUMBER" > "$RUNNER_TEMP/update.json"
+          APK_URL="https://github.com/$GITHUB_REPOSITORY/releases/download/debug-latest/cloudix-debug.apk"
+          printf '{"versionCode":%d,"sha256":"%s","url":"%s","title":"Build debug #%s"}\n' \
+            "$VERSION_CODE" "$DIGEST" "$APK_URL" "$GITHUB_RUN_NUMBER" > "$RUNNER_TEMP/update.json"
           python3 -m json.tool "$RUNNER_TEMP/update.json" >/dev/null
           if gh release view debug-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload debug-latest "$RUNNER_TEMP/cloudix-debug.apk" "$RUNNER_TEMP/update.json" \
