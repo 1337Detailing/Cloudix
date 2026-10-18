@@ -24,7 +24,6 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLServerSocket
 import javax.net.ssl.SSLSocket
-import android.util.Log
 import kotlin.concurrent.thread
 
 object CloudixStatus {
@@ -48,25 +47,25 @@ class CloudixService : Service() {
         }
         if (active) return START_STICKY
         if (CloudixSettings(this).rootUri.isBlank()) {
-            CloudixStatus.error.value = "Choisis un dossier serveur avant de démarrer."
+            CloudixStatus.error.value = getString(R.string.server_choose_folder)
             stopSelf()
             return START_NOT_STICKY
         }
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(NotificationChannel("cloudix_service",
-            "Serveur Cloudix", NotificationManager.IMPORTANCE_LOW))
+            getString(R.string.server_notification_channel), NotificationManager.IMPORTANCE_LOW))
         val stop = android.app.PendingIntent.getService(
             this, 1, Intent(this, CloudixService::class.java).setAction("STOP"),
             android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT
         )
         val notification = Notification.Builder(this, "cloudix_service")
-            .setContentTitle("Cloudix · serveur actif")
-            .setContentText("Fichiers disponibles sur ton réseau local")
+            .setContentTitle(getString(R.string.server_running))
+            .setContentText(getString(R.string.server_available))
             .setSmallIcon(android.R.drawable.stat_sys_upload_done)
             .setOngoing(true)
             .addAction(Notification.Action.Builder(
                 android.graphics.drawable.Icon.createWithResource(this, android.R.drawable.ic_menu_close_clear_cancel),
-                "Arrêter", stop).build())
+                getString(R.string.action_stop), stop).build())
             .build()
         startForeground(75, notification)
         active = true
@@ -94,7 +93,6 @@ class CloudixService : Service() {
                             } catch (e: Exception) {
                                 CloudixStatus.lastConnectionIssue.value =
                                     "${e.javaClass.simpleName}: ${e.message?.take(140) ?: "Négociation interrompue"}"
-                                Log.w("Cloudix", "Connexion TLS/HTTP refusée", e)
                             }
                         } }
                     } catch (_: java.util.concurrent.RejectedExecutionException) {
@@ -102,7 +100,7 @@ class CloudixService : Service() {
                     }
                 }
             } catch (e: Exception) {
-                if (active) CloudixStatus.error.value = e.message ?: "Impossible de démarrer le serveur."
+                if (active) CloudixStatus.error.value = e.message ?: getString(R.string.server_start_failed)
             } finally {
                 CloudixStatus.running.value = false
                 active = false
@@ -121,13 +119,13 @@ class CloudixService : Service() {
     private fun root(): DocumentFile {
         val uri = Uri.parse(CloudixSettings(this).rootUri)
         return DocumentFile.fromTreeUri(this, uri)
-            ?.takeIf { it.isDirectory } ?: throw IOException("Dossier serveur inaccessible")
+            ?.takeIf { it.isDirectory } ?: throw IOException(getString(R.string.server_root_unavailable))
     }
     private fun segments(path: String): List<String> {
-        require(!path.startsWith("/")) { "Chemin absolu interdit" }
+        require(!path.startsWith("/")) { getString(R.string.server_no_absolute_paths) }
         if (path.isBlank()) return emptyList()
         return path.split("/").also {
-            require(it.size <= 32 && it.all { name -> validName(name) }) { "Chemin invalide" }
+            require(it.size <= 32 && it.all { name -> validName(name) }) { getString(R.string.server_invalid_path) }
         }
     }
     private fun validName(name: String): Boolean =
@@ -138,8 +136,8 @@ class CloudixService : Service() {
     private fun locate(path: String): DocumentFile {
         var item = root()
         for (part in segments(path)) {
-            if (!item.isDirectory) throw FileNotFoundException("Pas un dossier")
-            item = item.findFile(part) ?: throw FileNotFoundException("Introuvable")
+            if (!item.isDirectory) throw FileNotFoundException(getString(R.string.server_not_folder))
+            item = item.findFile(part) ?: throw FileNotFoundException(getString(R.string.server_not_found))
         }
         return item
     }
@@ -147,11 +145,11 @@ class CloudixService : Service() {
         val buffer = java.io.ByteArrayOutputStream()
         while (buffer.size() <= 8192) {
             val b = input.read()
-            if (b < 0) throw IOException("Connexion interrompue")
+            if (b < 0) throw IOException(getString(R.string.server_disconnected))
             if (b == 10) return buffer.toString("UTF-8").trimEnd('\r')
             buffer.write(b)
         }
-        throw IOException("En-tête trop long")
+        throw IOException(getString(R.string.server_header_long))
     }
     private fun response(out: BufferedOutputStream, code: Int, body: ByteArray,
                          type: String = "application/json; charset=utf-8") {
@@ -177,26 +175,26 @@ class CloudixService : Service() {
         val out = BufferedOutputStream(socket.getOutputStream())
         try {
             val parts = readLine(input).split(' ')
-            require(parts.size == 3 && parts[2].startsWith("HTTP/1.")) { "Requête invalide" }
+            require(parts.size == 3 && parts[2].startsWith("HTTP/1.")) { getString(R.string.server_invalid_request) }
             val method = parts[0]
             val target = parts[1]
-            require(target.startsWith("/api/") && target.length < 2048) { "Route invalide" }
+            require(target.startsWith("/api/") && target.length < 2048) { getString(R.string.server_invalid_route) }
             val headers = mutableMapOf<String, String>()
             var size = 0
             while (true) {
                 val line = readLine(input)
                 if (line.isEmpty()) break
                 size += line.length
-                require(size < 16000 && headers.size < 50) { "Trop d'en-têtes" }
+                require(size < 16000 && headers.size < 50) { getString(R.string.server_many_headers) }
                 val colon = line.indexOf(':')
-                require(colon > 0) { "En-tête invalide" }
+                require(colon > 0) { getString(R.string.server_header_invalid) }
                 headers[line.substring(0, colon).trim().lowercase()] = line.substring(colon + 1).trim()
             }
             val secret = CloudixSettings(this).secret().toByteArray(StandardCharsets.UTF_8)
             val presented = headers["authorization"]?.removePrefix("Bearer ")
                 ?.toByteArray(StandardCharsets.UTF_8) ?: ByteArray(0)
             if (!MessageDigest.isEqual(secret, presented)) {
-                json(out, 401, "Non appairé")
+                json(out, 401, getString(R.string.server_not_paired))
                 return
             }
             val url = Uri.parse("https://localhost$target")
@@ -209,7 +207,7 @@ class CloudixService : Service() {
                 }
                 method == "GET" && url.path == "/api/list" -> {
                     val dir = locate(path)
-                    require(dir.isDirectory) { "Pas un dossier" }
+                    require(dir.isDirectory) { getString(R.string.server_not_folder) }
                     val array = JSONArray()
                     for (file in dir.listFiles()) {
                         val name = file.name ?: continue
@@ -223,10 +221,10 @@ class CloudixService : Service() {
                 }
                 method == "GET" && url.path == "/api/file" -> {
                     val file = locate(path)
-                    require(file.isFile) { "Pas un fichier" }
+                    require(file.isFile) { getString(R.string.server_not_file) }
                     val length = file.length()
-                    require(length >= 0) { "Taille inconnue" }
-                    val stream = contentResolver.openInputStream(file.uri) ?: throw IOException("Lecture impossible")
+                    require(length >= 0) { getString(R.string.server_size_unknown) }
+                    val stream = contentResolver.openInputStream(file.uri) ?: throw IOException(getString(R.string.server_read_failed))
                     out.write(("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n" +
                         "Content-Length: $length\r\nCache-Control: no-store\r\n" +
                         "X-Content-Type-Options: nosniff\r\nConnection: close\r\n\r\n").toByteArray())
@@ -235,40 +233,40 @@ class CloudixService : Service() {
                 }
                 method == "POST" && url.path == "/api/mkdir" -> {
                     val name = arg("name")
-                    require(validName(name)) { "Nom invalide" }
+                    require(validName(name)) { getString(R.string.server_invalid_name) }
                     val dir = locate(path)
-                    require(dir.isDirectory) { "Dossier introuvable" }
-                    if (dir.findFile(name) != null) { json(out, 409, "Existe déjà"); return }
-                    require(dir.createDirectory(name) != null) { "Création impossible" }
-                    json(out, 200, "Dossier créé")
+                    require(dir.isDirectory) { getString(R.string.server_folder_not_found) }
+                    if (dir.findFile(name) != null) { json(out, 409, getString(R.string.server_exists)); return }
+                    require(dir.createDirectory(name) != null) { getString(R.string.server_create_failed) }
+                    json(out, 200, getString(R.string.server_folder_created))
                 }
                 method == "POST" && url.path == "/api/rename" -> {
-                    require(path.isNotBlank()) { "Racine non modifiable" }
+                    require(path.isNotBlank()) { getString(R.string.server_root_readonly) }
                     val name = arg("name")
-                    require(validName(name)) { "Nom invalide" }
+                    require(validName(name)) { getString(R.string.server_invalid_name) }
                     val file = locate(path)
                     val parent = path.substringBeforeLast('/', "")
                     val sibling = locate(parent).findFile(name)
                     if (sibling != null) {
-                        json(out, 409, "Ce nom existe déjà")
+                        json(out, 409, getString(R.string.server_duplicate_name))
                         return
                     }
-                    require(file.renameTo(name)) { "Renommage impossible" }
-                    json(out, 200, "Renommé")
+                    require(file.renameTo(name)) { getString(R.string.server_rename_failed) }
+                    json(out, 200, getString(R.string.server_renamed))
                 }
                 method == "POST" && url.path == "/api/delete" -> {
-                    require(path.isNotBlank()) { "Suppression de la racine interdite" }
+                    require(path.isNotBlank()) { getString(R.string.server_no_root_delete) }
                     val file = locate(path)
-                    require(file.delete()) { "Suppression impossible" }
-                    json(out, 200, "Supprimé")
+                    require(file.delete()) { getString(R.string.server_delete_failed) }
+                    json(out, 200, getString(R.string.server_deleted))
                 }
                 method == "POST" && url.path == "/api/upload" -> {
                     val name = arg("name")
-                    require(validName(name)) { "Nom invalide" }
+                    require(validName(name)) { getString(R.string.server_invalid_name) }
                     val length = headers["content-length"]?.toLongOrNull() ?: -1L
-                    require(length in 0..4_294_967_296L) { "Taille invalide" }
+                    require(length in 0..4_294_967_296L) { getString(R.string.server_size_invalid) }
                     val dir = locate(path)
-                    require(dir.isDirectory) { "Destination introuvable" }
+                    require(dir.isDirectory) { getString(R.string.server_target_missing) }
                     var filename = name
                     var i = 1
                     while (dir.findFile(filename) != null && i < 1000) {
@@ -276,20 +274,20 @@ class CloudixService : Service() {
                             if ('.' in name) ".${name.substringAfterLast('.')}" else ""
                         i++
                     }
-                    require(dir.findFile(filename) == null) { "Trop de doublons" }
+                    require(dir.findFile(filename) == null) { getString(R.string.server_duplicates) }
                     val newFile = dir.createFile("application/octet-stream", filename)
-                        ?: throw IOException("Création impossible")
+                        ?: throw IOException(getString(R.string.server_create_failed))
                     try {
                         val output = contentResolver.openOutputStream(newFile.uri, "w")
-                            ?: throw IOException("Ecriture impossible")
+                            ?: throw IOException(getString(R.string.server_write_failed))
                         output.use { copyExactly(input, it, length) }
                     } catch (e: Exception) {
                         newFile.delete()
                         throw e
                     }
-                    json(out, 200, "Fichier reçu")
+                    json(out, 200, getString(R.string.server_uploaded))
                 }
-                else -> json(out, 405, "Route ou méthode inconnue")
+                else -> json(out, 405, getString(R.string.server_route_unknown))
             }
         } catch (e: Exception) {
             try {
@@ -299,8 +297,7 @@ class CloudixService : Service() {
                     else -> 500
                 }
                 CloudixStatus.lastConnectionIssue.value = "${e.javaClass.simpleName}: ${e.message?.take(140) ?: "erreur serveur"}"
-                Log.w("Cloudix", "Requête refusée", e)
-                json(out, status, if (status == 500) "Erreur interne" else (e.message ?: "Erreur"))
+                json(out, status, if (status == 500) getString(R.string.server_internal) else (e.message ?: getString(R.string.server_generic_error)))
             } catch (_: Exception) { /* client disconnected */ }
         }
     }
