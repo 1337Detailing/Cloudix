@@ -46,19 +46,20 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun CloudixScaffold(
     role: String, page: Int, onPage: (Int) -> Unit,
-    header: String, subtitle: String, content: @Composable (PaddingValues) -> Unit
+    header: String, content: @Composable (PaddingValues) -> Unit
 ) {
+    val context = LocalContext.current
     val tabs = if (role == "server") listOf(
-        Triple("Accueil", Icons.Rounded.Home, 0),
-        Triple("Stockage", Icons.Rounded.Folder, 1),
-        Triple("Thèmes", Icons.Rounded.Palette, 3),
-        Triple("Réglages", Icons.Rounded.Tune, 4)
+        Triple(context.getString(R.string.common_accueil), Icons.Rounded.Home, 0),
+        Triple(context.getString(R.string.common_stockage), Icons.Rounded.Folder, 1),
+        Triple(context.getString(R.string.common_themes), Icons.Rounded.Palette, 3),
+        Triple(context.getString(R.string.common_reglages), Icons.Rounded.Tune, 4)
     ) else listOf(
-        Triple("Accueil", Icons.Rounded.Home, 0),
-        Triple("Fichiers", Icons.Rounded.FolderOpen, 1),
+        Triple(context.getString(R.string.common_accueil), Icons.Rounded.Home, 0),
+        Triple(context.getString(R.string.common_fichiers), Icons.Rounded.FolderOpen, 1),
         Triple("Backup", Icons.Rounded.Backup, 2),
-        Triple("Thèmes", Icons.Rounded.Palette, 3),
-        Triple("Réglages", Icons.Rounded.Tune, 4)
+        Triple(context.getString(R.string.common_themes), Icons.Rounded.Palette, 3),
+        Triple(context.getString(R.string.common_reglages), Icons.Rounded.Tune, 4)
     )
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -72,19 +73,18 @@ fun CloudixScaffold(
                     Box(Modifier.size(52.dp).clip(RoundedCornerShape(16.dp))
                         .background(Color.Black), contentAlignment = Alignment.Center) {
                         Image(painterResource(R.drawable.ic_launcher_foreground),
-                            contentDescription = "Logo Cloudix",
+                            contentDescription = context.getString(R.string.common_logo_cloudix),
                             modifier = Modifier.fillMaxSize())
                     }
                     Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f)) {
                         Text(header, style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.ExtraBold)
-                        Text(subtitle, style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+
                     }
                     Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh,
                         shape = RoundedCornerShape(14.dp)) {
-                        Text(if (role == "server") "SERVEUR" else "CLIENT",
+                        Text(if (role == "server") context.getString(R.string.common_serveur) else context.getString(R.string.common_client),
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                             style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
@@ -117,6 +117,7 @@ fun CloudixScaffold(
 
 @Composable
 fun WelcomeScreen(onServer: () -> Unit, onClient: () -> Unit) {
+    val context = LocalContext.current
     Column(
         Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
             .statusBarsPadding().navigationBarsPadding().verticalScrollCompat()
@@ -127,26 +128,25 @@ fun WelcomeScreen(onServer: () -> Unit, onClient: () -> Unit) {
         Box(Modifier.size(96.dp).clip(RoundedCornerShape(28.dp))
             .background(Color.Black), contentAlignment = Alignment.Center) {
             Image(painterResource(R.drawable.ic_launcher_foreground),
-                contentDescription = "Logo Cloudix",
+                contentDescription = context.getString(R.string.common_logo_cloudix),
                 modifier = Modifier.fillMaxSize())
         }
         Spacer(Modifier.height(30.dp))
-        Text("Bienvenue sur", style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text("Cloudix.", style = MaterialTheme.typography.displayLarge,
+
+        Text(context.getString(R.string.common_cloudix), style = MaterialTheme.typography.displayLarge,
             color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.ExtraBold)
         Spacer(Modifier.height(10.dp))
-        Text("Ton espace, sur tous tes appareils.",
+        Text(context.getString(R.string.common_ton_espace_sur_tous_tes_appareils),
             style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(10.dp))
-        Text("Aucun abonnement. Aucun cloud imposé. Choisis le rôle de ce téléphone.",
+        Text(context.getString(R.string.common_aucun_abonnement_aucun_cloud_impose_choisis_l),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyLarge)
         Spacer(Modifier.height(34.dp))
-        RoleCard("Mon serveur", "Je garde les fichiers et partage mon stockage en Wi-Fi",
+        RoleCard(context.getString(R.string.common_mon_serveur), context.getString(R.string.common_je_garde_les_fichiers_et_partage_mon_stockage),
             Icons.Rounded.Dns, onServer)
         Spacer(Modifier.height(14.dp))
-        RoleCard("Mon client", "J'explore, j'envoie et je sauvegarde mes dossiers",
+        RoleCard(context.getString(R.string.common_mon_client), context.getString(R.string.common_j_explore_j_envoie_et_je_sauvegarde_mes_dossi),
             Icons.Rounded.PhoneAndroid, onClient)
         Spacer(Modifier.height(28.dp))
         Surface(shape = RoundedCornerShape(18.dp),
@@ -155,7 +155,7 @@ fun WelcomeScreen(onServer: () -> Unit, onClient: () -> Unit) {
                 Icon(Icons.Rounded.Lock, null, modifier = Modifier.size(18.dp),
                     tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(9.dp))
-                Text("Connexion chiffrée · Stockage privé · Sans root obligatoire",
+                Text(context.getString(R.string.common_connexion_chiffree_stockage_prive_sans_root_o),
                     style = MaterialTheme.typography.labelSmall)
             }
         }

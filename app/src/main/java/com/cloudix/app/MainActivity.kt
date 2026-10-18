@@ -101,9 +101,10 @@ fun CloudixApp(incoming: String) {
     var connectionChecked by remember { mutableStateOf(false) }
     var tailscaleInput by remember { mutableStateOf(settings.tailscaleAddress) }
     var clientTailscaleInput by remember { mutableStateOf("") }
+    var backupDeviceNameInput by remember { mutableStateOf(settings.backupDeviceName) }
     var showTailscaleDialog by remember { mutableStateOf(false) }
 
-    fun report(error: Throwable) { message = error.message ?: "Une erreur s'est produite." }
+    fun report(error: Throwable) { message = error.message ?: context.getString(R.string.main_une_erreur_s_est_produite) }
     suspend fun refresh() {
         if (role != "client" || peerLink.isBlank()) return
         loading = true
@@ -151,16 +152,16 @@ fun CloudixApp(incoming: String) {
                         val (name, size) = resolver.query(uri,
                             arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
                             null, null, null)?.use { cursor ->
-                            if (!cursor.moveToFirst()) throw IllegalStateException("Document introuvable")
+                            if (!cursor.moveToFirst()) throw IllegalStateException(context.getString(R.string.main_document_introuvable))
                             val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                             val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
                             val n = if (nameIndex >= 0) cursor.getString(nameIndex) else null
                             val s = if (sizeIndex >= 0 && !cursor.isNull(sizeIndex))
                                 cursor.getLong(sizeIndex) else -1L
-                            (n ?: "Fichier") to s
-                        } ?: throw IllegalStateException("Fichier illisible")
+                            (n ?: context.getString(R.string.main_fichier)) to s
+                        } ?: throw IllegalStateException(context.getString(R.string.main_fichier_illisible))
                         if (size < 0) throw IllegalStateException("Taille inconnue : $name")
-                        val stream = resolver.openInputStream(uri) ?: throw IllegalStateException("Lecture impossible")
+                        val stream = resolver.openInputStream(uri) ?: throw IllegalStateException(context.getString(R.string.main_lecture_impossible))
                         client.upload(folder, name, size, stream)
                     }
                 }
@@ -177,7 +178,7 @@ fun CloudixApp(incoming: String) {
             try {
                 withContext(Dispatchers.IO) {
                     val output = context.contentResolver.openOutputStream(uri)
-                        ?: throw IllegalStateException("Impossible de créer le fichier")
+                        ?: throw IllegalStateException(context.getString(R.string.main_impossible_de_creer_le_fichier))
                     CloudixClient(Peer.parse(peerLink), context).download(file.path, output)
                 }
                 message = "Fichier téléchargé : ${file.name}"
@@ -247,7 +248,7 @@ fun CloudixApp(incoming: String) {
                 onClient = { role = "client"; settings.role = role })
         } else {
             CloudixScaffold(role, page, { page = it },
-                "Cloudix", if (role == "server") "Ton espace privé" else "Ton cloud, partout") { insets ->
+                "Cloudix") { insets ->
                 AnimatedContent(targetState = page,
                     transitionSpec = {
                         if (settings.animations) {
@@ -261,16 +262,16 @@ fun CloudixApp(incoming: String) {
                                 .padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                                 if (role == "server") {
                                     HeroCard(
-                                        if (CloudixStatus.running.value) "Serveur en ligne" else "Serveur en veille",
+                                        if (CloudixStatus.running.value) context.getString(R.string.main_serveur_en_ligne) else context.getString(R.string.main_serveur_en_veille),
                                         if (CloudixStatus.running.value)
-                                            "Le Xiaomi partage ton dossier en HTTPS sur ton réseau local."
-                                        else "Choisis un dossier puis démarre le partage.",
+                                            context.getString(R.string.main_le_xiaomi_partage_ton_dossier_en_https_sur_to)
+                                        else context.getString(R.string.main_choisis_un_dossier_puis_demarre_le_partage),
                                         Icons.Rounded.Dns
                                     ) {
                                         Button(onClick = {
                                             if (CloudixStatus.running.value) {
                                                 context.startService(Intent(context, CloudixService::class.java)
-                                                    .setAction("STOP"))
+                                                    .setAction(context.getString(R.string.main_stop)))
                                             } else {
                                                 if (Build.VERSION.SDK_INT >= 33)
                                                     permissions.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -281,9 +282,9 @@ fun CloudixApp(incoming: String) {
                                         }, enabled = rootUri.isNotBlank()) {
                                             Icon(if (CloudixStatus.running.value) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, null)
                                             Spacer(Modifier.width(6.dp))
-                                            Text(if (CloudixStatus.running.value) "Arrêter" else "Démarrer")
+                                            Text(if (CloudixStatus.running.value) context.getString(R.string.main_arreter) else context.getString(R.string.main_demarrer))
                                         }
-                                        OutlinedButton(onClick = { chooseRoot.launch(null) }) { Text("Dossier") }
+                                        OutlinedButton(onClick = { chooseRoot.launch(null) }) { Text(context.getString(R.string.main_dossier)) }
                                     }
                                     if (CloudixStatus.error.value.isNotBlank())
                                         Text(CloudixStatus.error.value, color = MaterialTheme.colorScheme.error)
@@ -291,7 +292,7 @@ fun CloudixApp(incoming: String) {
                                         ElevatedCard(colors = CardDefaults.elevatedCardColors(
                                             containerColor = MaterialTheme.colorScheme.errorContainer)) {
                                             Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                                                Text("Dernière erreur réseau", fontWeight = FontWeight.Bold,
+                                                Text(context.getString(R.string.main_derniere_erreur_reseau), fontWeight = FontWeight.Bold,
                                                     color = MaterialTheme.colorScheme.onErrorContainer)
                                                 Text(CloudixStatus.lastConnectionIssue.value,
                                                     style = MaterialTheme.typography.bodySmall,
@@ -299,13 +300,13 @@ fun CloudixApp(incoming: String) {
                                             }
                                         }
                                     }
-                                    SectionTitle("Connexion", "HTTPS + PIN TLS")
-                                    SettingItem(Icons.Rounded.HealthAndSafety, "Diagnostic réseau",
-                                        if (diagnostic.isBlank()) "Vérifier TLS sur le Xiaomi"
+                                    SectionTitle(context.getString(R.string.main_connexion), context.getString(R.string.main_https_pin_tls))
+                                    SettingItem(Icons.Rounded.HealthAndSafety, context.getString(R.string.main_diagnostic_reseau),
+                                        if (diagnostic.isBlank()) context.getString(R.string.main_verifier_tls_sur_le_xiaomi)
                                         else diagnostic) {
                                         TextButton(enabled = CloudixStatus.running.value, onClick = {
                                             scope.launch {
-                                                diagnostic = "Test en cours…"
+                                                diagnostic = context.getString(R.string.main_test_en_cours)
                                                 try {
                                                     val latency = withContext(Dispatchers.IO) {
                                                         CloudixClient(Peer("127.0.0.1", 8731,
@@ -316,14 +317,14 @@ fun CloudixApp(incoming: String) {
                                                     diagnostic = "Échec local : ${e.message}"
                                                 }
                                             }
-                                        }) { Text("Tester") }
+                                        }) { Text(context.getString(R.string.main_tester)) }
                                     }
-                                    SettingItem(Icons.Rounded.Wifi, "Adresse sur le réseau",
+                                    SettingItem(Icons.Rounded.Wifi, context.getString(R.string.main_adresse_sur_le_reseau),
                                         "${CloudixSettings.localAddress() ?: "Wi-Fi indisponible"}:8731")
-                                    SettingItem(Icons.Rounded.Folder, "Dossier partagé",
-                                        if (rootUri.isEmpty()) "Aucun dossier sélectionné"
+                                    SettingItem(Icons.Rounded.Folder, context.getString(R.string.main_dossier_partage),
+                                        if (rootUri.isEmpty()) context.getString(R.string.main_aucun_dossier_selectionne)
                                         else DocumentFile.fromTreeUri(context, Uri.parse(rootUri))?.name ?: "Sélectionné") {
-                                        TextButton(onClick = { chooseRoot.launch(null) }) { Text("Changer") }
+                                        TextButton(onClick = { chooseRoot.launch(null) }) { Text(context.getString(R.string.main_changer)) }
                                     }
                                     if (CloudixStatus.running.value) {
                                         val pairing = remember(CloudixStatus.running.value, revision) {
@@ -333,24 +334,24 @@ fun CloudixApp(incoming: String) {
                                             PairingCard(pairing, onShare = {
                                                 context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                                                     type = "text/plain"; putExtra(Intent.EXTRA_TEXT, pairing)
-                                                }, "Partager l'appairage"))
+                                                }, context.getString(R.string.main_partager_l_appairage)))
                                             })
                                         }
                                     }
-                                    SectionTitle("Tailscale · Connexion 5G")
+                                    SectionTitle(context.getString(R.string.main_tailscale_connexion_5g))
                                     val detectedTailscale = remember(revision, CloudixStatus.running.value) {
                                         CloudixTailnet.detectOnDevice()
                                     }
-                                    SettingItem(Icons.Rounded.VpnKey, "VPN privé du Xiaomi",
+                                    SettingItem(Icons.Rounded.VpnKey, context.getString(R.string.main_vpn_prive_du_xiaomi),
                                         detectedTailscale?.let { "Adresse détectée : $it" }
-                                            ?: "Installe Tailscale puis relève l'adresse 100.x du Xiaomi")
+                                            ?: context.getString(R.string.main_installe_tailscale_puis_releve_l_adresse_100_))
                                     OutlinedTextField(
                                         value = tailscaleInput,
                                         onValueChange = { tailscaleInput = it.trim() },
-                                        label = { Text("Adresse Tailscale du Xiaomi") },
+                                        label = { Text(context.getString(R.string.main_adresse_tailscale_du_xiaomi)) },
                                         placeholder = { Text("100.100.100.100") },
                                         supportingText = {
-                                            Text("IP de Tailscale, pas l'IP Wi-Fi. Laisse vide si détectée automatiquement.")
+                                            Text(context.getString(R.string.main_ip_de_tailscale_pas_l_ip_wi_fi_laisse_vide_si))
                                         },
                                         singleLine = true,
                                         modifier = Modifier.fillMaxWidth()
@@ -360,55 +361,53 @@ fun CloudixApp(incoming: String) {
                                             try {
                                                 settings.tailscaleAddress = tailscaleInput
                                                 revision++
-                                                message = "Adresse VPN enregistrée. Affiche un nouveau QR d'appairage sur le Xiaomi."
+                                                message = context.getString(R.string.main_adresse_vpn_enregistree_affiche_un_nouveau_qr)
                                             } catch (e: Exception) { report(e) }
-                                        }) { Text("Enregistrer") }
+                                        }) { Text(context.getString(R.string.main_enregistrer)) }
                                         OutlinedButton(onClick = {
                                             context.startActivity(Intent(Intent.ACTION_VIEW,
                                                 Uri.parse("https://play.google.com/store/apps/details?id=com.tailscale.ipn")))
-                                        }) { Text("Installer Tailscale") }
+                                        }) { Text(context.getString(R.string.main_installer_tailscale)) }
                                     }
-                                    Text("Tailscale doit être connecté sur les deux téléphones. Le réseau VPN est gratuit pour un usage personnel et ne stocke pas tes fichiers.",
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        style = MaterialTheme.typography.bodySmall)
-                                    SectionTitle("Connexion directe 5G")
+
+                                    SectionTitle(context.getString(R.string.main_connexion_directe_5g))
                                     val globalV6 = remember(revision, CloudixStatus.running.value) {
                                         CloudixSettings.globalIpv6Address()
                                     }
-                                    SettingItem(Icons.Rounded.Public, "Adresse IPv6 publique",
-                                        globalV6 ?: "Indisponible sur le Wi-Fi du Xiaomi") {
+                                    SettingItem(Icons.Rounded.Public, context.getString(R.string.main_adresse_ipv6_publique),
+                                        globalV6 ?: context.getString(R.string.main_indisponible_sur_le_wi_fi_du_xiaomi)) {
                                         IconButton(onClick = { revision++ }) {
                                             Icon(Icons.Rounded.Refresh,
-                                                contentDescription = "Actualiser l'adresse IPv6")
+                                                contentDescription = context.getString(R.string.main_actualiser_l_adresse_ipv6))
                                         }
                                     }
                                     Text(if (globalV6 == null)
-                                        "Aucune IPv6 publique détectée. Sans accès à la box ni relais, la connexion 5G directe est impossible sur ce réseau."
+                                        context.getString(R.string.main_aucune_ipv6_publique_detectee_sans_acces_a_la)
                                     else
-                                        "IPv6 détectée : teste le QR depuis le Vivo en 5G. Le pare-feu de la box peut encore bloquer les connexions entrantes.",
+                                        context.getString(R.string.main_ipv6_detectee_teste_le_qr_depuis_le_vivo_en_5),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         style = MaterialTheme.typography.bodySmall)
                                 } else {
                                     HeroCard(
                                         when {
-                                            peerLink.isBlank() -> "Connecte ton serveur"
-                                            connectionChecking -> "Connexion en cours"
-                                            connectionVerified -> "Xiaomi connecté"
-                                            connectionChecked -> "Xiaomi inaccessible"
-                                            else -> "Xiaomi appairé"
+                                            peerLink.isBlank() -> context.getString(R.string.main_connecte_ton_serveur)
+                                            connectionChecking -> context.getString(R.string.main_connexion_en_cours)
+                                            connectionVerified -> context.getString(R.string.main_xiaomi_connecte)
+                                            connectionChecked -> context.getString(R.string.main_xiaomi_inaccessible)
+                                            else -> context.getString(R.string.main_xiaomi_appaire)
                                         },
                                         when {
-                                            peerLink.isBlank() -> "Scanne le QR code du Xiaomi pour démarrer."
-                                            connectionVerified -> "Connexion TLS active : tes fichiers sont accessibles."
-                                            connectionChecking -> "Vérification de la liaison avec le Xiaomi…"
-                                            connectionChecked -> "Le Xiaomi n'est pas joignable. Lance le diagnostic pour connaître la cause."
-                                            else -> "Le serveur est enregistré, mais sa disponibilité n'a pas été vérifiée."
+                                            peerLink.isBlank() -> context.getString(R.string.main_scanne_le_qr_code_du_xiaomi_pour_demarrer)
+                                            connectionVerified -> context.getString(R.string.main_connexion_tls_active_tes_fichiers_sont_access)
+                                            connectionChecking -> context.getString(R.string.main_verification_de_la_liaison_avec_le_xiaomi)
+                                            connectionChecked -> context.getString(R.string.main_le_xiaomi_n_est_pas_joignable_lance_le_diagno)
+                                            else -> context.getString(R.string.main_le_serveur_est_enregistre_mais_sa_disponibili)
                                         },
                                         if (connectionVerified) Icons.Rounded.CloudDone else Icons.Rounded.CloudQueue
                                     ) {
                                         Button(onClick = { page = if (peerLink.isBlank()) 0 else 1 },
                                             enabled = peerLink.isNotBlank()) {
-                                            Text("Mes fichiers"); Icon(Icons.Rounded.ChevronRight, null)
+                                            Text(context.getString(R.string.main_mes_fichiers)); Icon(Icons.Rounded.ChevronRight, null)
                                         }
                                     }
                                     if (peerLink.isBlank()) {
@@ -416,7 +415,7 @@ fun CloudixApp(incoming: String) {
                                             onScan = {
                                                 qrScanner.launch(ScanOptions()
                                                     .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                                                    .setPrompt("Scanne le code Cloudix du Xiaomi")
+                                                    .setPrompt(context.getString(R.string.main_scanne_le_code_cloudix_du_xiaomi))
                                                     .setBeepEnabled(false))
                                             },
                                             onConnect = {
@@ -430,7 +429,7 @@ fun CloudixApp(incoming: String) {
                                                         }
                                                         settings.peer = link
                                                         peerLink = link
-                                                        message = "Appairage réussi"
+                                                        message = context.getString(R.string.main_appairage_reussi)
                                                     } catch (e: Exception) { report(e) }
                                                 }
                                             })
@@ -439,44 +438,44 @@ fun CloudixApp(incoming: String) {
                                             try { Peer.parse(peerLink) } catch (_: Exception) { null }
                                         }
                                         if (paired != null) {
-                                            SettingItem(Icons.Rounded.VpnKey, "VPN Tailscale (5G)",
+                                            SettingItem(Icons.Rounded.VpnKey, context.getString(R.string.main_vpn_tailscale_5g),
                                                 paired.tailscale?.let { "Xiaomi : $it — VPN requis sur les deux appareils" }
-                                                    ?: "Configurer l'IP Tailscale 100.x du Xiaomi") {
+                                                    ?: context.getString(R.string.main_configurer_l_ip_tailscale_100_x_du_xiaomi)) {
                                                 TextButton(onClick = {
                                                     clientTailscaleInput = paired.tailscale.orEmpty()
                                                     showTailscaleDialog = true
-                                                }) { Text("Configurer") }
+                                                }) { Text(context.getString(R.string.main_configurer)) }
                                             }
-                                            SettingItem(Icons.Rounded.Public, "IPv6 directe",
+                                            SettingItem(Icons.Rounded.Public, context.getString(R.string.main_ipv6_directe),
                                                 if (paired.globalIpv6 == null)
-                                                    "Aucune IPv6 publique enregistrée."
+                                                    context.getString(R.string.main_aucune_ipv6_publique_enregistree)
                                                 else if (paired.tailscale != null)
-                                                    "Tailscale a la priorité sur l'IPv6 publique."
-                                                else "IPv6 enregistrée, mais la box peut bloquer les accès.")
+                                                    context.getString(R.string.main_tailscale_a_la_priorite_sur_l_ipv6_publique)
+                                                else context.getString(R.string.main_ipv6_enregistree_mais_la_box_peut_bloquer_les))
                                             if (paired.tailscale == null) {
                                                 OutlinedButton(onClick = {
                                                     context.startActivity(Intent(Intent.ACTION_VIEW,
                                                         Uri.parse("https://play.google.com/store/apps/details?id=com.tailscale.ipn")))
-                                                }) { Text("Installer Tailscale") }
+                                                }) { Text(context.getString(R.string.main_installer_tailscale)) }
                                             }
                                         }
                                         if (paired?.globalIpv6 != null) {
-                                            SettingItem(Icons.Rounded.SettingsEthernet, "Privilégier IPv6",
-                                                "Utiliser l'adresse IPv6 même quand le Vivo est en Wi-Fi") {
+                                            SettingItem(Icons.Rounded.SettingsEthernet, context.getString(R.string.main_privilegier_ipv6),
+                                                context.getString(R.string.main_utiliser_l_adresse_ipv6_meme_quand_le_vivo_es)) {
                                                 Switch(settings.preferDirectIpv6, onCheckedChange = {
                                                     settings.preferDirectIpv6 = it
                                                     revision++
                                                 })
                                             }
                                         }
-                                        SectionTitle("Raccourcis")
-                                        SettingItem(Icons.Rounded.CheckCircle, "Tester la connexion",
-                                            diagnostic.ifBlank { "Vérifier Wi-Fi, IPv6, TLS et authentification" }) {
+                                        SectionTitle(context.getString(R.string.main_raccourcis))
+                                        SettingItem(Icons.Rounded.CheckCircle, context.getString(R.string.main_tester_la_connexion),
+                                            diagnostic.ifBlank { context.getString(R.string.main_verifier_wi_fi_ipv6_tls_et_authentification) }) {
                                             TextButton(enabled = !connectionChecking, onClick = {
                                                 scope.launch {
                                                     connectionChecking = true
                                                     connectionVerified = false
-                                                    diagnostic = "Diagnostic en cours (maximum ~12 s)…"
+                                                    diagnostic = context.getString(R.string.main_diagnostic_en_cours_maximum_12_s)
                                                     try {
                                                         val result = withContext(Dispatchers.IO) {
                                                             CloudixConnectivity.check(context, Peer.parse(peerLink))
@@ -488,19 +487,19 @@ fun CloudixApp(incoming: String) {
                                                     } catch (e: Exception) {
                                                         connectionVerified = false
                                                         connectionChecked = true
-                                                        diagnostic = "Échec du diagnostic"
+                                                        diagnostic = context.getString(R.string.main_echec_du_diagnostic)
                                                         report(e)
                                                     } finally {
                                                         connectionChecking = false
                                                     }
                                                 }
-                                            }) { Text(if (connectionChecking) "Analyse…" else "Tester") }
+                                            }) { Text(if (connectionChecking) context.getString(R.string.main_analyse) else context.getString(R.string.main_tester)) }
                                         }
-                                        SettingItem(Icons.Rounded.FolderOpen, "Explorer les fichiers",
-                                            "Dossiers du serveur") { TextButton(onClick = { page = 1 }) { Text("Ouvrir") } }
-                                        SettingItem(Icons.Rounded.Backup, "Sauvegarde automatique",
+                                        SettingItem(Icons.Rounded.FolderOpen, context.getString(R.string.main_explorer_les_fichiers),
+                                            context.getString(R.string.main_dossiers_du_serveur)) { TextButton(onClick = { page = 1 }) { Text(context.getString(R.string.main_ouvrir)) } }
+                                        SettingItem(Icons.Rounded.Backup, context.getString(R.string.main_sauvegarde_automatique),
                                             "${settings.backupFolders.size} dossier(s) configuré(s)") {
-                                            TextButton(onClick = { page = 2 }) { Text("Gérer") }
+                                            TextButton(onClick = { page = 2 }) { Text(context.getString(R.string.main_gerer)) }
                                         }
                                     }
                                 }
@@ -508,29 +507,29 @@ fun CloudixApp(incoming: String) {
                             1 -> if (role == "server") {
                                 Column(Modifier.fillMaxSize().verticalScrollCompat()
                                     .padding(20.dp)) {
-                                    SectionTitle("Stockage partagé")
-                                    SettingItem(Icons.Rounded.Folder, "Dossier racine", rootUri.ifBlank { "Non sélectionné" }) {
-                                        TextButton(onClick = { chooseRoot.launch(null) }) { Text("Choisir") }
+                                    SectionTitle(context.getString(R.string.main_stockage_partage))
+                                    SettingItem(Icons.Rounded.Folder, context.getString(R.string.main_dossier_racine), rootUri.ifBlank { context.getString(R.string.main_non_selectionne) }) {
+                                        TextButton(onClick = { chooseRoot.launch(null) }) { Text(context.getString(R.string.main_choisir)) }
                                     }
-                                    Text("Seul le dossier choisi via le système Android est exposé au client.",
+                                    Text(context.getString(R.string.main_seul_le_dossier_choisi_via_le_systeme_android),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             } else Column(Modifier.fillMaxSize().padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     IconButton(onClick = {
                                         currentPath = currentPath.substringBeforeLast('/', "")
-                                    }, enabled = currentPath.isNotBlank()) { Icon(Icons.Rounded.ArrowBack, "Retour") }
+                                    }, enabled = currentPath.isNotBlank()) { Icon(Icons.Rounded.ArrowBack, context.getString(R.string.main_retour)) }
                                     Column(Modifier.weight(1f)) {
-                                        Text(if (currentPath.isBlank()) "Mes fichiers" else currentPath,
+                                        Text(if (currentPath.isBlank()) context.getString(R.string.main_mes_fichiers) else currentPath,
                                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                                             style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                                         Text("${files.size} éléments", style = MaterialTheme.typography.labelSmall)
                                     }
                                     IconButton(onClick = { scope.launch { refresh() } }) {
-                                        Icon(Icons.Rounded.Refresh, "Actualiser")
+                                        Icon(Icons.Rounded.Refresh, context.getString(R.string.main_actualiser))
                                     }
                                     IconButton(onClick = { showFolderDialog = true }) {
-                                        Icon(Icons.Rounded.CreateNewFolder, "Nouveau dossier")
+                                        Icon(Icons.Rounded.CreateNewFolder, context.getString(R.string.main_nouveau_dossier))
                                     }
                                 }
                                 OutlinedTextField(value = searchQuery,
@@ -540,12 +539,12 @@ fun CloudixApp(incoming: String) {
                                     leadingIcon = { Icon(Icons.Rounded.Search, null) },
                                     trailingIcon = {
                                         if (searchQuery.isNotEmpty()) IconButton(onClick = { searchQuery = "" }) {
-                                            Icon(Icons.Rounded.Close, "Effacer")
+                                            Icon(Icons.Rounded.Close, context.getString(R.string.main_effacer))
                                         }
-                                    }, label = { Text("Rechercher dans ce dossier") },
+                                    }, label = { Text(context.getString(R.string.main_rechercher_dans_ce_dossier)) },
                                     shape = MaterialTheme.shapes.large)
                                 Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                                    listOf("name" to "Nom", "date" to "Récents", "size" to "Taille").forEach { (id, label) ->
+                                    listOf("name" to context.getString(R.string.main_nom), "date" to context.getString(R.string.main_recents), "size" to context.getString(R.string.main_taille)).forEach { (id, label) ->
                                         FilterChip(selected = settings.sort == id,
                                             onClick = { settings.sort = id; revision++ },
                                             label = { Text(label) })
@@ -570,7 +569,7 @@ fun CloudixApp(incoming: String) {
                                                 modifier = Modifier.size(44.dp),
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                             Spacer(Modifier.height(10.dp))
-                                            Text(if (searchQuery.isNotBlank()) "Aucun résultat" else "Dossier vide",
+                                            Text(if (searchQuery.isNotBlank()) context.getString(R.string.main_aucun_resultat) else context.getString(R.string.main_dossier_vide),
                                                 style = MaterialTheme.typography.titleMedium)
                                         }
                                     }
@@ -596,7 +595,7 @@ fun CloudixApp(incoming: String) {
                                                 Column(Modifier.weight(1f)) {
                                                     Text(file.name, maxLines = 1, overflow = TextOverflow.Ellipsis,
                                                         fontWeight = FontWeight.Medium)
-                                                    Text(if (file.directory) "Dossier" else readableBytes(file.size),
+                                                    Text(if (file.directory) context.getString(R.string.main_dossier) else readableBytes(file.size),
                                                         style = MaterialTheme.typography.labelSmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                                                 }
@@ -604,23 +603,23 @@ fun CloudixApp(incoming: String) {
                                                     if (file.directory) currentPath = file.path
                                                     else { pendingDownload = file; createDownload.launch(file.name) }
                                                 }) { Icon(if (file.directory) Icons.Rounded.ChevronRight
-                                                    else Icons.Rounded.Download, "Ouvrir") }
+                                                    else Icons.Rounded.Download, context.getString(R.string.main_ouvrir)) }
                                                 var expanded by remember(file.path) { mutableStateOf(false) }
                                                 Box {
                                                     IconButton(onClick = { expanded = true }) {
-                                                        Icon(Icons.Rounded.MoreVert, "Options du fichier")
+                                                        Icon(Icons.Rounded.MoreVert, context.getString(R.string.main_options_du_fichier))
                                                     }
                                                     DropdownMenu(expanded = expanded, onDismissRequest = {
                                                         expanded = false
                                                     }) {
                                                         DropdownMenuItem(
-                                                            text = { Text("Renommer") },
+                                                            text = { Text(context.getString(R.string.main_renommer)) },
                                                             leadingIcon = { Icon(Icons.Rounded.DriveFileRenameOutline, null) },
                                                             onClick = {
                                                                 expanded = false; pendingRename = file; renameName = file.name
                                                             })
                                                         DropdownMenuItem(
-                                                            text = { Text("Supprimer") },
+                                                            text = { Text(context.getString(R.string.main_supprimer)) },
                                                             leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) },
                                                             onClick = { expanded = false; pendingDelete = file })
                                                     }
@@ -632,22 +631,35 @@ fun CloudixApp(incoming: String) {
                                 Button(onClick = { chooseUpload.launch(arrayOf("*/*")) },
                                     modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {
                                     Icon(Icons.Rounded.UploadFile, null)
-                                    Spacer(Modifier.width(8.dp)); Text("Envoyer des fichiers")
+                                    Spacer(Modifier.width(8.dp)); Text(context.getString(R.string.main_envoyer_des_fichiers))
                                 }
                             }
                             2 -> if (role == "client") {
                                 Column(Modifier.fillMaxSize().verticalScrollCompat().padding(20.dp)) {
-                                    SectionTitle("Sauvegardes automatiques")
-                                    Text("Cloudix transfère uniquement les dossiers que tu autorises. Android planifie les tâches en arrière-plan (fréquence approximative).",
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Spacer(Modifier.height(16.dp))
-                                    SettingItem(Icons.Rounded.Wifi, "Wi-Fi uniquement",
-                                        "Désactive pour autoriser les sauvegardes en 4G/5G") {
+                                    SectionTitle(context.getString(R.string.main_sauvegardes_automatiques))
+                                    Spacer(Modifier.height(8.dp))
+                                    SettingItem(Icons.Rounded.Wifi, context.getString(R.string.main_wi_fi_uniquement),
+                                        context.getString(R.string.main_desactive_pour_autoriser_les_sauvegardes_en_4)) {
                                         Switch(settings.wifiOnly, onCheckedChange = {
                                             settings.wifiOnly = it; BackupScheduler.schedule(context); revision++
                                         })
                                     }
-                                    SectionTitle("Fréquence")
+                                    SectionTitle(context.getString(R.string.main_nom_de_l_appareil))
+                                    OutlinedTextField(
+                                        value = backupDeviceNameInput,
+                                        onValueChange = { backupDeviceNameInput = it.take(60) },
+                                        label = { Text(context.getString(R.string.main_nom_des_sauvegardes)) },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    TextButton(onClick = {
+                                        try {
+                                            settings.backupDeviceName = backupDeviceNameInput
+                                            backupNotice = context.getString(R.string.main_nom_enregistre_les_prochaines_sauvegardes_uti)
+                                            revision++
+                                        } catch (e: Exception) { report(e) }
+                                    }) { Text(context.getString(R.string.main_enregistrer)) }
+                                    SectionTitle(context.getString(R.string.main_frequence))
                                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         listOf(15L, 60L, 360L, 1440L).forEach { mins ->
                                             FilterChip(selected = settings.interval == mins,
@@ -655,39 +667,39 @@ fun CloudixApp(incoming: String) {
                                                     settings.interval = mins
                                                     BackupScheduler.schedule(context); revision++
                                                 },
-                                                label = { Text(when (mins) { 15L -> "15 min"
-                                                    60L -> "1 h"; 360L -> "6 h"; else -> "24 h" }) })
+                                                label = { Text(when (mins) { 15L -> context.getString(R.string.main_15_min)
+                                                    60L -> context.getString(R.string.main_1_h); 360L -> context.getString(R.string.main_6_h); else -> context.getString(R.string.main_24_h) }) })
                                         }
                                     }
-                                    SectionTitle("Dossiers surveillés", "${settings.backupFolders.size}")
+                                    SectionTitle(context.getString(R.string.main_dossiers_surveilles), "${settings.backupFolders.size}")
                                     settings.backupFolders.forEach { uri ->
                                         val name = remember(uri) {
                                             DocumentFile.fromTreeUri(context, Uri.parse(uri))?.name ?: "Dossier"
                                         }
                                         SettingItem(Icons.Rounded.FolderCopy, name,
-                                            "Sauvegardé vers Backups/") {
+                                            context.getString(R.string.main_sauvegarde_vers_backups)) {
                                             IconButton(onClick = {
                                                 settings.backupFolders = settings.backupFolders - uri
                                                 BackupScheduler.schedule(context); revision++
-                                            }) { Icon(Icons.Rounded.Close, "Retirer") }
+                                            }) { Icon(Icons.Rounded.Close, context.getString(R.string.main_retirer)) }
                                         }
                                     }
                                     Spacer(Modifier.height(16.dp))
                                     FilledTonalButton(onClick = { addBackup.launch(null) },
                                         modifier = Modifier.fillMaxWidth()) {
                                         Icon(Icons.Rounded.Add, null)
-                                        Spacer(Modifier.width(8.dp)); Text("Ajouter un dossier à sauvegarder")
+                                        Spacer(Modifier.width(8.dp)); Text(context.getString(R.string.main_ajouter_un_dossier_a_sauvegarder))
                                     }
                                     OutlinedButton(
                                         enabled = !manualBackupStarting &&
                                             manualBackupInfo?.state != WorkInfo.State.RUNNING,
                                         onClick = {
                                             if (peerLink.isBlank() || settings.backupFolders.isEmpty()) {
-                                                backupNotice = "Sélectionne au moins un dossier et connecte le Xiaomi."
+                                                backupNotice = context.getString(R.string.main_selectionne_au_moins_un_dossier_et_connecte_l)
                                             } else {
                                                 scope.launch {
                                                     manualBackupStarting = true
-                                                    backupNotice = "Vérification de la connexion sécurisée au Xiaomi..."
+                                                    backupNotice = context.getString(R.string.main_verification_de_la_connexion_securisee_au_xia)
                                                     try {
                                                         // Distinguish a reachable Xiaomi from a queued request:
                                                         // this ping uses exactly the same peer/Tailscale route as the Worker.
@@ -700,8 +712,8 @@ fun CloudixApp(incoming: String) {
                                                         manualBackupInfo = null
                                                         backupError = ""
                                                         backupNotice = if (settings.wifiOnly)
-                                                            "Serveur joignable. La sauvegarde attend un réseau non facturé."
-                                                        else "Serveur joignable. Sauvegarde demandée sur Wi-Fi ou 4G/5G."
+                                                            context.getString(R.string.main_serveur_joignable_la_sauvegarde_attend_un_res)
+                                                        else context.getString(R.string.main_serveur_joignable_sauvegarde_demandee_sur_wi_)
                                                     } catch (e: Exception) {
                                                         backupNotice =
                                                             "Sauvegarde non lancée : ${e.message ?: "connexion impossible"}"
@@ -714,7 +726,7 @@ fun CloudixApp(incoming: String) {
                                     ) {
                                         Icon(Icons.Rounded.Sync, null)
                                         Spacer(Modifier.width(8.dp))
-                                        Text(if (manualBackupStarting) "Connexion..." else "Sauvegarder maintenant")
+                                        Text(if (manualBackupStarting) context.getString(R.string.main_connexion_2) else context.getString(R.string.main_sauvegarder_maintenant))
                                     }
                                     val work = manualBackupInfo
                                     val working = work?.state == WorkInfo.State.RUNNING
@@ -726,28 +738,28 @@ fun CloudixApp(incoming: String) {
                                     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
                                         Column(Modifier.padding(16.dp),
                                             verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Text("État de la sauvegarde",
+                                            Text(context.getString(R.string.main_etat_de_la_sauvegarde),
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.SemiBold)
                                             Text(when {
-                                                manualBackupStarting -> "Connexion au serveur..."
+                                                manualBackupStarting -> context.getString(R.string.main_connexion_au_serveur)
                                                 working -> work?.progress?.getString("phase")
-                                                    ?: "Sauvegarde en cours..."
+                                                    ?: context.getString(R.string.main_sauvegarde_en_cours)
                                                 queued && backupError.isNotBlank() ->
                                                     "Nouvelle tentative : $backupError"
                                                 queued -> if (settings.wifiOnly)
-                                                    "En attente d’un réseau non facturé ou d’Android..."
-                                                else "En attente du lancement par Android (Wi-Fi / 4G / 5G)..."
+                                                    context.getString(R.string.main_en_attente_d_un_reseau_non_facture_ou_d_andro)
+                                                else context.getString(R.string.main_en_attente_du_lancement_par_android_wi_fi_4g_)
                                                 work?.state == WorkInfo.State.SUCCEEDED ->
-                                                    if (savedNow == 0) "Terminé : les fichiers sont déjà sauvegardés."
+                                                    if (savedNow == 0) context.getString(R.string.main_termine_les_fichiers_sont_deja_sauvegardes)
                                                     else "Terminé : $savedNow fichier(s) transféré(s) au Xiaomi."
                                                 work?.state == WorkInfo.State.FAILED ->
                                                     "Sauvegarde échouée : ${work.outputData.getString("error")
-                                                        ?: backupError.ifBlank { "Consulte le diagnostic." }}"
+                                                        ?: backupError.ifBlank { context.getString(R.string.main_consulte_le_diagnostic) }}"
                                                 work?.state == WorkInfo.State.CANCELLED ->
-                                                    "Sauvegarde interrompue."
+                                                    context.getString(R.string.main_sauvegarde_interrompue)
                                                 backupNotice.isNotBlank() -> backupNotice
-                                                else -> "Aucune sauvegarde manuelle récente."
+                                                else -> context.getString(R.string.main_aucune_sauvegarde_manuelle_recente)
                                             }, style = MaterialTheme.typography.bodyMedium)
                                             if (working || manualBackupStarting) {
                                                 LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -771,51 +783,49 @@ fun CloudixApp(incoming: String) {
                                             style = MaterialTheme.typography.bodyMedium)
                                     }
                                     if (backupLastAt > 0L) {
-                                        SettingItem(Icons.Rounded.History, "Dernier passage",
+                                        SettingItem(Icons.Rounded.History, context.getString(R.string.main_dernier_passage),
                                             java.text.DateFormat.getDateTimeInstance().format(
                                                 java.util.Date(backupLastAt)))
                                     }
-                                    Text("Si le Xiaomi n'est pas accessible, WorkManager réessaiera plus tard. Les fichiers supprimés ne sont pas effacés du serveur.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+
                                 }
                             }
                             3 -> AppearancePage(settings) { revision++ }
                             4 -> Column(Modifier.fillMaxSize().verticalScrollCompat().padding(20.dp)) {
-                                SectionTitle("Configuration")
-                                SettingItem(Icons.Rounded.Security, "Chiffrement et appairage",
-                                    "TLS avec certificat épinglé et secret aléatoire")
+                                SectionTitle(context.getString(R.string.main_configuration))
+                                SettingItem(Icons.Rounded.Security, context.getString(R.string.main_chiffrement_et_appairage),
+                                    context.getString(R.string.main_tls_avec_certificat_epingle_et_secret_aleatoi))
                                 if (role == "server") {
                                     SettingItem(Icons.Rounded.PowerSettingsNew,
-                                        "Démarrer après redémarrage",
-                                        "Lancer automatiquement le serveur au démarrage du Xiaomi") {
+                                        context.getString(R.string.main_demarrer_apres_redemarrage),
+                                        context.getString(R.string.main_lancer_automatiquement_le_serveur_au_demarrag)) {
                                         Switch(checked = settings.serverAutoStart,
                                             onCheckedChange = {
                                                 settings.serverAutoStart = it; revision++
                                             })
                                     }
-                                    Text("HyperOS peut bloquer les démarrages automatiques : autorise Cloudix dans les paramètres d'activité en arrière-plan.",
+                                    Text(context.getString(R.string.main_hyperos_peut_bloquer_les_demarrages_automatiq),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     OutlinedButton(onClick = {
                                         settings.regenerateSecret()
-                                        message = "Ancien appairage révoqué. Partage un nouveau QR code."
+                                        message = context.getString(R.string.main_ancien_appairage_revoque_partage_un_nouveau_q)
                                         revision++
-                                    }) { Text("Révoquer tous les clients appairés") }
+                                    }) { Text(context.getString(R.string.main_revoquer_tous_les_clients_appaires)) }
                                 } else {
                                     OutlinedButton(onClick = {
                                         settings.peer = ""; peerLink = ""; currentPath = ""; files = emptyList()
-                                    }) { Text("Déconnecter ce serveur") }
+                                    }) { Text(context.getString(R.string.main_deconnecter_ce_serveur)) }
                                 }
                                 UpdatesPanel()
-                                SectionTitle("Appareil")
-                                SettingItem(Icons.Rounded.PhoneAndroid, "Mode actif",
-                                    if (role == "server") "Serveur" else "Client")
+                                SectionTitle(context.getString(R.string.main_appareil))
+                                SettingItem(Icons.Rounded.PhoneAndroid, context.getString(R.string.main_mode_actif),
+                                    if (role == "server") context.getString(R.string.main_serveur) else context.getString(R.string.main_client))
                                 OutlinedButton(onClick = {
                                     if (role == "server") context.startService(
-                                        Intent(context, CloudixService::class.java).setAction("STOP"))
+                                        Intent(context, CloudixService::class.java).setAction(context.getString(R.string.main_stop)))
                                     settings.role = ""; role = ""; page = 0
-                                }) { Text("Changer le rôle de ce téléphone") }
+                                }) { Text(context.getString(R.string.main_changer_le_role_de_ce_telephone)) }
                                 Spacer(Modifier.height(16.dp))
                                 Text("Cloudix ${BuildConfig.VERSION_NAME} · VPN Tailscale · Signature Android",
                                     style = MaterialTheme.typography.labelSmall,
@@ -829,18 +839,18 @@ fun CloudixApp(incoming: String) {
         if (showTailscaleDialog) {
             AlertDialog(
                 onDismissRequest = { showTailscaleDialog = false },
-                title = { Text("Connexion Tailscale") },
+                title = { Text(context.getString(R.string.main_connexion_tailscale)) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Entre l'adresse 100.x affichée dans Tailscale SUR LE XIAOMI. Ne saisis pas celle du Vivo.")
+                        Text(context.getString(R.string.main_entre_l_adresse_100_x_affichee_dans_tailscale))
                         OutlinedTextField(
                             value = clientTailscaleInput,
                             onValueChange = { clientTailscaleInput = it.trim() },
-                            label = { Text("IP Tailscale du Xiaomi") },
+                            label = { Text(context.getString(R.string.main_ip_tailscale_du_xiaomi)) },
                             placeholder = { Text("100.100.100.100") },
                             singleLine = true
                         )
-                        Text("La clé d'appairage et la vérification TLS existantes sont conservées.",
+                        Text(context.getString(R.string.main_la_cle_d_appairage_et_la_verification_tls_exi),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -856,26 +866,26 @@ fun CloudixApp(incoming: String) {
                             connectionChecked = false
                             diagnostic = ""
                             showTailscaleDialog = false
-                            message = "Adresse Tailscale enregistrée. Active Tailscale sur les deux téléphones, puis appuie sur Tester."
+                            message = context.getString(R.string.main_adresse_tailscale_enregistree_active_tailscal)
                         } catch (e: Exception) { report(e) }
-                    }) { Text("Enregistrer") }
+                    }) { Text(context.getString(R.string.main_enregistrer)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showTailscaleDialog = false }) { Text("Annuler") }
+                    TextButton(onClick = { showTailscaleDialog = false }) { Text(context.getString(R.string.main_annuler)) }
                 }
             )
         }
         if (message.isNotEmpty()) {
             AlertDialog(onDismissRequest = { message = "" }, confirmButton = {
-                TextButton(onClick = { message = "" }) { Text("OK") }
+                TextButton(onClick = { message = "" }) { Text(context.getString(R.string.main_ok)) }
             }, title = { Text("Cloudix") }, text = { Text(message) })
         }
         pendingRename?.let { file ->
             AlertDialog(
                 onDismissRequest = { pendingRename = null },
-                title = { Text("Renommer") },
+                title = { Text(context.getString(R.string.main_renommer)) },
                 text = { OutlinedTextField(renameName, { renameName = it },
-                    label = { Text("Nouveau nom") }, singleLine = true) },
+                    label = { Text(context.getString(R.string.main_nouveau_nom)) }, singleLine = true) },
                 confirmButton = {
                     TextButton(onClick = {
                         pendingRename = null
@@ -887,10 +897,10 @@ fun CloudixApp(incoming: String) {
                                 refresh()
                             } catch (e: Exception) { report(e) }
                         }
-                    }, enabled = renameName.isNotBlank()) { Text("Enregistrer") }
+                    }, enabled = renameName.isNotBlank()) { Text(context.getString(R.string.main_enregistrer)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { pendingRename = null }) { Text("Annuler") }
+                    TextButton(onClick = { pendingRename = null }) { Text(context.getString(R.string.main_annuler)) }
                 }
             )
         }
@@ -898,7 +908,7 @@ fun CloudixApp(incoming: String) {
             AlertDialog(
                 onDismissRequest = { pendingDelete = null },
                 title = { Text("Supprimer ${file.name} ?") },
-                text = { Text("Cette suppression est définitive sur le serveur.") },
+                text = { Text(context.getString(R.string.main_cette_suppression_est_definitive_sur_le_serve)) },
                 confirmButton = {
                     TextButton(onClick = {
                         pendingDelete = null
@@ -910,15 +920,15 @@ fun CloudixApp(incoming: String) {
                                 refresh()
                             } catch (e: Exception) { report(e) }
                         }
-                    }) { Text("Supprimer") }
+                    }) { Text(context.getString(R.string.main_supprimer)) }
                 },
-                dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("Annuler") } }
+                dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text(context.getString(R.string.main_annuler)) } }
             )
         }
         if (showFolderDialog) {
             AlertDialog(onDismissRequest = { showFolderDialog = false },
-                title = { Text("Nouveau dossier") },
-                text = { OutlinedTextField(newFolder, { newFolder = it }, label = { Text("Nom") }) },
+                title = { Text(context.getString(R.string.main_nouveau_dossier)) },
+                text = { OutlinedTextField(newFolder, { newFolder = it }, label = { Text(context.getString(R.string.main_nom)) }) },
                 confirmButton = {
                     TextButton(onClick = {
                         showFolderDialog = false
@@ -930,9 +940,9 @@ fun CloudixApp(incoming: String) {
                                 newFolder = ""; refresh()
                             } catch (e: Exception) { report(e) }
                         }
-                    }) { Text("Créer") }
+                    }) { Text(context.getString(R.string.main_creer)) }
                 },
-                dismissButton = { TextButton(onClick = { showFolderDialog = false }) { Text("Annuler") } }
+                dismissButton = { TextButton(onClick = { showFolderDialog = false }) { Text(context.getString(R.string.main_annuler)) } }
             )
         }
     }
@@ -942,17 +952,17 @@ fun CloudixApp(incoming: String) {
 private fun PairInput(link: String, onLink: (String) -> Unit, onScan: () -> Unit, onConnect: () -> Unit) {
     ElevatedCard(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.extraLarge) {
         Column(Modifier.padding(20.dp)) {
-            SectionTitle("Associer ton Xiaomi")
+            SectionTitle(context.getString(R.string.main_associer_ton_xiaomi))
             OutlinedTextField(link, onLink, modifier = Modifier.fillMaxWidth(),
-                label = { Text("Lien Cloudix") },
+                label = { Text(context.getString(R.string.main_lien_cloudix)) },
                 placeholder = { Text("cloudix://pair?...") }, maxLines = 3)
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onScan) {
                     Icon(Icons.Rounded.QrCodeScanner, null); Spacer(Modifier.width(8.dp))
-                    Text("Scanner")
+                    Text(context.getString(R.string.main_scanner))
                 }
-                Button(onClick = onConnect, enabled = link.isNotBlank()) { Text("Se connecter") }
+                Button(onClick = onConnect, enabled = link.isNotBlank()) { Text(context.getString(R.string.main_se_connecter)) }
             }
         }
     }
@@ -962,9 +972,9 @@ private fun PairingCard(link: String, onShare: () -> Unit) {
     var reveal by remember { mutableStateOf(false) }
     ElevatedCard(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.extraLarge) {
         Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Appairer un appareil", style = MaterialTheme.typography.titleLarge,
+            Text(context.getString(R.string.main_appairer_un_appareil), style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold)
-            Text("Le QR code est confidentiel : il donne accès à tes fichiers.",
+            Text(context.getString(R.string.main_le_qr_code_est_confidentiel_il_donne_acces_a_),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(12.dp))
@@ -978,15 +988,15 @@ private fun PairingCard(link: String, onShare: () -> Unit) {
                                 else android.graphics.Color.WHITE)
                         }
                 }
-                Image(bitmap.asImageBitmap(), "Code QR d'appairage",
+                Image(bitmap.asImageBitmap(), context.getString(R.string.main_code_qr_d_appairage),
                     modifier = Modifier.size(220.dp))
             }
             Spacer(Modifier.height(8.dp))
             FilledTonalButton(onClick = { reveal = !reveal }) {
-                Text(if (reveal) "Masquer le QR" else "Afficher le QR")
+                Text(if (reveal) context.getString(R.string.main_masquer_le_qr) else context.getString(R.string.main_afficher_le_qr))
             }
             TextButton(onClick = onShare) { Icon(Icons.Rounded.Share, null)
-                Spacer(Modifier.width(6.dp)); Text("Partager le lien") }
+                Spacer(Modifier.width(6.dp)); Text(context.getString(R.string.main_partager_le_lien)) }
         }
     }
 }
@@ -994,5 +1004,5 @@ private fun readableBytes(n: Long): String = when {
     n < 1024 -> "$n o"
     n < 1024 * 1024 -> "${n / 1024} Ko"
     n < 1024L * 1024L * 1024L -> "${n / (1024 * 1024)} Mo"
-    else -> "${"%.1f".format(n.toDouble() / (1024.0 * 1024 * 1024))} Go"
+    else -> "${"%.1fcontext.getString(R.string.main_format_n_todouble_1024_0_1024_1024_go)
 }

@@ -39,6 +39,7 @@ private fun isDarkTheme(settings: CloudixSettings): Boolean =
 
 @Composable
 fun AppearancePage(settings: CloudixSettings, onChange: () -> Unit) {
+    val context = LocalContext.current
     val snapshot = settings.appearance // observed: immediate recompose after every update
     val scheme = MaterialTheme.colorScheme
     var selector by remember { mutableStateOf("") }
@@ -46,20 +47,20 @@ fun AppearancePage(settings: CloudixSettings, onChange: () -> Unit) {
     var showResetConfirm by remember { mutableStateOf(false) }
 
     val themeChoices = listOf(
-        AppearanceChoice("system", "Système", "Suit automatiquement le thème de ton téléphone", Color(0xFF898993)),
-        AppearanceChoice("dark", "Sombre", "Fond foncé et contraste doux", Color(0xFF22222D), true),
-        AppearanceChoice("light", "Clair", "Surfaces lumineuses et aérées", Color(0xFFE8E6EC))
+        AppearanceChoice("system", context.getString(R.string.appearance_systeme), context.getString(R.string.appearance_suit_automatiquement_le_theme_de_ton_telephon), Color(0xFF898993)),
+        AppearanceChoice("dark", context.getString(R.string.appearance_sombre), context.getString(R.string.appearance_fond_fonce_et_contraste_doux), Color(0xFF22222D), true),
+        AppearanceChoice("light", context.getString(R.string.appearance_clair), context.getString(R.string.appearance_surfaces_lumineuses_et_aerees), Color(0xFFE8E6EC))
     )
     val surfaceChoices = listOf(
-        AppearanceChoice("soft", "Teinte légère", "Fond subtil avec une douce teinte", scheme.primary),
-        AppearanceChoice("strong", "Teinte intense", "Surfaces plus profondes et colorées", scheme.primary),
-        AppearanceChoice("amoled", "AMOLED", "Noir véritable pour un contraste maximal", Color(0xFF060606), true),
-        AppearanceChoice("amoled_plain", "AMOLED sans teinte", "Noir pur, seuls boutons et icônes gardent leur accent", Color.Black, true)
+        AppearanceChoice("soft", context.getString(R.string.style_teinte_legere), context.getString(R.string.appearance_fond_subtil_avec_une_douce_teinte), scheme.primary),
+        AppearanceChoice("strong", context.getString(R.string.style_teinte_intense), context.getString(R.string.style_surfaces_plus_profondes_et_colorees), scheme.primary),
+        AppearanceChoice("amoled", context.getString(R.string.style_amoled), context.getString(R.string.appearance_noir_veritable_pour_un_contraste_maximal), Color(0xFF060606), true),
+        AppearanceChoice("amoled_plain", context.getString(R.string.style_amoled_sans_teinte), context.getString(R.string.appearance_noir_pur_seuls_boutons_et_icones_gardent_leur), Color.Black, true)
     )
     val accents = CloudixAppearanceCatalog.presets.mapIndexed { i, preset ->
-        AppearanceChoice(i.toString(), preset.label, preset.description, hexColor(preset.hex))
+        AppearanceChoice(i.toString(), context.getString(preset.labelRes), context.getString(preset.descriptionRes), hexColor(preset.hex))
     }
-    val selectedName = CloudixAppearanceCatalog.presets[snapshot.accent].label
+    val selectedName = context.getString(CloudixAppearanceCatalog.presets[snapshot.accent].labelRes)
 
     Column(
         Modifier.fillMaxSize().verticalScrollCompat()
@@ -70,32 +71,30 @@ fun AppearancePage(settings: CloudixSettings, onChange: () -> Unit) {
             Icon(Icons.Rounded.Tune, contentDescription = null,
                 tint = scheme.primary, modifier = Modifier.size(25.dp))
             Spacer(Modifier.width(10.dp))
-            Text("Look & Feel", style = MaterialTheme.typography.headlineMedium,
+            Text(context.getString(R.string.appearance_look_feel), style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.ExtraBold)
         }
         Spacer(Modifier.height(5.dp))
-        Text("Ton style, sans redémarrage. Chaque choix est visible immédiatement.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = scheme.onSurfaceVariant)
+
         Spacer(Modifier.height(19.dp))
         LiveAppearancePreview()
         Spacer(Modifier.height(19.dp))
 
-        SectionTitle("Apparence", "THÈME")
-        AppearanceOptionRow(Icons.Rounded.DarkMode, "Thème de l'application",
+        SectionTitle(context.getString(R.string.appearance_apparence), context.getString(R.string.appearance_theme))
+        AppearanceOptionRow(Icons.Rounded.DarkMode, context.getString(R.string.appearance_theme_de_l_application),
             themeChoices.first { it.id == snapshot.theme }.title,
             onClick = { selector = "theme" })
-        AppearanceOptionRow(Icons.Rounded.Layers, "Intensité des surfaces",
+        AppearanceOptionRow(Icons.Rounded.Layers, context.getString(R.string.appearance_intensite_des_surfaces),
             surfaceChoices.first { it.id == snapshot.surfaceStyle }.title,
             onClick = { selector = "surface" })
-        AppearanceOptionRow(Icons.Rounded.ColorLens, "Couleur d'accent",
-            if (snapshot.dynamic) "Material You" else selectedName,
+        AppearanceOptionRow(Icons.Rounded.ColorLens, context.getString(R.string.role_couleur_d_accent),
+            if (snapshot.dynamic) context.getString(R.string.appearance_material_you) else selectedName,
             onClick = { selector = "accent" })
 
-        SettingItem(Icons.Rounded.AutoAwesome, "Material You dynamique",
+        SettingItem(Icons.Rounded.AutoAwesome, context.getString(R.string.appearance_material_you_dynamique),
             if (android.os.Build.VERSION.SDK_INT >= 31)
-                "Couleurs générées à partir du fond d'écran Android"
-            else "Nécessite Android 12 ou plus récent") {
+                context.getString(R.string.appearance_couleurs_generees_a_partir_du_fond_d_ecran_an)
+            else context.getString(R.string.appearance_necessite_android_12_ou_plus_recent)) {
             Switch(checked = snapshot.dynamic && android.os.Build.VERSION.SDK_INT >= 31,
                 enabled = android.os.Build.VERSION.SDK_INT >= 31,
                 onCheckedChange = {
@@ -105,9 +104,8 @@ fun AppearancePage(settings: CloudixSettings, onChange: () -> Unit) {
                 })
         }
 
-        SectionTitle("Couleurs individuelles", "HEX")
-        Text("Modifie précisément chaque élément. Une couleur personnalisée remplace la valeur du thème pour cet élément.",
-            style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+        SectionTitle(context.getString(R.string.appearance_couleurs_individuelles), context.getString(R.string.appearance_hex))
+
         Spacer(Modifier.height(10.dp))
         Surface(shape = RoundedCornerShape(25.dp),
             color = scheme.surfaceContainerLow,
@@ -124,7 +122,7 @@ fun AppearancePage(settings: CloudixSettings, onChange: () -> Unit) {
                             modifier = Modifier.size(42.dp)) {}
                         Spacer(Modifier.width(13.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(role.title, style = MaterialTheme.typography.bodyLarge,
+                            Text(context.getString(role.titleRes), style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Medium)
                             Text(current ?: colorCode(color),
                                 style = MaterialTheme.typography.bodySmall,
@@ -135,7 +133,7 @@ fun AppearancePage(settings: CloudixSettings, onChange: () -> Unit) {
                                 tint = scheme.primary, modifier = Modifier.size(19.dp))
                             Spacer(Modifier.width(9.dp))
                         }
-                        Icon(Icons.Rounded.Edit, contentDescription = "Modifier ${role.title}",
+                        Icon(Icons.Rounded.Edit, contentDescription = context.getString(R.string.label_modifier_1, context.getString(role.titleRes)),
                             modifier = Modifier.size(20.dp), tint = scheme.onSurfaceVariant)
                     }
                     if (index != CloudixColorRole.entries.lastIndex) {
@@ -150,12 +148,12 @@ fun AppearancePage(settings: CloudixSettings, onChange: () -> Unit) {
             modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Rounded.RestartAlt, null, modifier = Modifier.size(19.dp))
             Spacer(Modifier.width(7.dp))
-            Text("Effacer les couleurs personnalisées")
+            Text(context.getString(R.string.appearance_effacer_les_couleurs_personnalisees))
         }
         Spacer(Modifier.height(15.dp))
-        SectionTitle("Animations")
-        SettingItem(Icons.Rounded.Animation, "Transitions fluides",
-            "Teintes animées, sélections souples et mouvement de navigation") {
+        SectionTitle(context.getString(R.string.appearance_animations))
+        SettingItem(Icons.Rounded.Animation, context.getString(R.string.appearance_transitions_fluides),
+            context.getString(R.string.appearance_teintes_animees_selections_souples_et_mouveme)) {
             Switch(checked = snapshot.animations, onCheckedChange = {
                 settings.animations = it
                 onChange()
@@ -165,7 +163,7 @@ fun AppearancePage(settings: CloudixSettings, onChange: () -> Unit) {
         OutlinedButton(onClick = { showResetConfirm = true }, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Rounded.SettingsBackupRestore, null, modifier = Modifier.size(19.dp))
             Spacer(Modifier.width(7.dp))
-            Text("Réinitialiser toute l'apparence")
+            Text(context.getString(R.string.appearance_reinitialiser_toute_l_apparence))
         }
         Spacer(Modifier.height(24.dp))
     }
@@ -179,9 +177,9 @@ fun AppearancePage(settings: CloudixSettings, onChange: () -> Unit) {
     if (selector.isNotBlank()) {
         AppearanceChoiceDialog(
             title = when (selector) {
-                "theme" -> "Thème de l'application"
-                "surface" -> "Intensité des surfaces"
-                else -> "Couleur d'accent"
+                "theme" -> context.getString(R.string.appearance_theme_de_l_application)
+                "surface" -> context.getString(R.string.appearance_intensite_des_surfaces)
+                else -> context.getString(R.string.role_couleur_d_accent)
             },
             items = choices,
             chosen = when (selector) {
@@ -229,17 +227,17 @@ fun AppearancePage(settings: CloudixSettings, onChange: () -> Unit) {
     if (showResetConfirm) {
         AlertDialog(
             onDismissRequest = { showResetConfirm = false },
-            title = { Text("Réinitialiser le thème ?") },
-            text = { Text("Les couleurs, les surfaces et les animations reviennent aux paramètres Cloudix par défaut.") },
+            title = { Text(context.getString(R.string.appearance_reinitialiser_le_theme)) },
+            text = { Text(context.getString(R.string.appearance_les_couleurs_les_surfaces_et_les_animations_r)) },
             confirmButton = {
                 TextButton(onClick = {
                     settings.resetAppearance()
                     showResetConfirm = false
                     onChange()
-                }) { Text("Réinitialiser") }
+                }) { Text(context.getString(R.string.appearance_reinitialiser)) }
             },
             dismissButton = {
-                TextButton(onClick = { showResetConfirm = false }) { Text("Annuler") }
+                TextButton(onClick = { showResetConfirm = false }) { Text(context.getString(R.string.main_annuler)) }
             }
         )
     }
@@ -247,6 +245,7 @@ fun AppearancePage(settings: CloudixSettings, onChange: () -> Unit) {
 
 @Composable
 private fun LiveAppearancePreview() {
+    val context = LocalContext.current
     val color = MaterialTheme.colorScheme
     Surface(shape = RoundedCornerShape(28.dp), color = color.surfaceContainerHigh,
         modifier = Modifier.fillMaxWidth()) {
@@ -259,11 +258,9 @@ private fun LiveAppearancePreview() {
                 }
                 Spacer(Modifier.width(13.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Aperçu en direct", fontWeight = FontWeight.ExtraBold,
+                    Text(context.getString(R.string.appearance_apercu_en_direct), fontWeight = FontWeight.ExtraBold,
                         style = MaterialTheme.typography.titleLarge)
-                    Text("Thème appliqué dans toute l'application",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = color.onSurfaceVariant)
+
                 }
                 Surface(shape = RoundedCornerShape(14.dp),
                     color = color.primaryContainer) {
@@ -276,14 +273,14 @@ private fun LiveAppearancePreview() {
                 Button(onClick = {}, enabled = false,
                     colors = ButtonDefaults.buttonColors(disabledContainerColor = color.primary,
                         disabledContentColor = color.onPrimary)) {
-                    Text("Bouton")
+                    Text(context.getString(R.string.appearance_bouton))
                 }
                 Surface(color = color.surface, shape = RoundedCornerShape(14.dp)) {
                     Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.Folder, null, tint = color.primary, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(7.dp))
-                        Text("Carte", style = MaterialTheme.typography.labelLarge)
+                        Text(context.getString(R.string.appearance_carte), style = MaterialTheme.typography.labelLarge)
                     }
                 }
             }
@@ -336,6 +333,7 @@ private fun AppearanceChoiceDialog(
     onChoose: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     val colors = MaterialTheme.colorScheme
     // Long accent lists open on the current selection, not at the first preset.
     val selectedIndex = items.indexOfFirst { it.id == chosen }.coerceAtLeast(0)
@@ -374,7 +372,7 @@ private fun AppearanceChoiceDialog(
                             }
                             if (selected) {
                                 Spacer(Modifier.width(6.dp))
-                                Icon(Icons.Rounded.Check, "Sélectionné", tint = colors.primary)
+                                Icon(Icons.Rounded.Check, context.getString(R.string.appearance_selectionne), tint = colors.primary)
                             }
                         }
                     }
@@ -382,7 +380,7 @@ private fun AppearanceChoiceDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Fermer") }
+            TextButton(onClick = onDismiss) { Text(context.getString(R.string.appearance_fermer)) }
         },
         shape = RoundedCornerShape(31.dp)
     )
@@ -434,16 +432,17 @@ private fun ColorEditorDialog(
     onReset: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     var input by remember(role) { mutableStateOf(initialColor) }
     val parsed = CloudixHex.normalize(input)
     val preview = parsed?.let { hexColor(it) } ?: MaterialTheme.colorScheme.primary
     val colors = MaterialTheme.colorScheme
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(role.title) },
+        title = { Text(context.getString(role.titleRes)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
-                Text(role.description, color = colors.onSurfaceVariant,
+                Text(context.getString(role.descriptionRes), color = colors.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(shape = RoundedCornerShape(16.dp), color = preview,
@@ -452,14 +451,14 @@ private fun ColorEditorDialog(
                     Spacer(Modifier.width(13.dp))
                     OutlinedTextField(value = input, onValueChange = {
                         input = it.take(9)
-                    }, label = { Text("Hexadécimal") },
+                    }, label = { Text(context.getString(R.string.appearance_hexadecimal)) },
                         placeholder = { Text("#D8B65A") },
                         singleLine = true, isError = parsed == null,
                         modifier = Modifier.weight(1f))
                 }
                 Text(if (parsed == null)
-                    "Saisis une couleur au format #RRGGBB."
-                else "Appuie sur Appliquer : toute l'interface change immédiatement.",
+                    context.getString(R.string.appearance_saisis_une_couleur_au_format_rrggbb)
+                else context.getString(R.string.appearance_appuie_sur_appliquer_toute_l_interface_change),
                     color = if (parsed == null) colors.error else colors.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -473,20 +472,20 @@ private fun ColorEditorDialog(
                 }
                 if (role == CloudixColorRole.TEXT && parsed != null &&
                     contrastRatio(preview, background) < 4.5f) {
-                    Text("Contraste inférieur à 4,5:1 : ce texte risque d'être difficile à lire.",
+                    Text(context.getString(R.string.appearance_contraste_inferieur_a_4_5_1_ce_texte_risque_d),
                         color = colors.error, style = MaterialTheme.typography.bodySmall)
                 }
             }
         },
         confirmButton = {
             TextButton(enabled = parsed != null, onClick = { parsed?.let(onSave) }) {
-                Text("Appliquer")
+                Text(context.getString(R.string.appearance_appliquer))
             }
         },
         dismissButton = {
             Row {
-                if (isOverride) TextButton(onClick = onReset) { Text("Réinitialiser") }
-                TextButton(onClick = onDismiss) { Text("Annuler") }
+                if (isOverride) TextButton(onClick = onReset) { Text(context.getString(R.string.appearance_reinitialiser)) }
+                TextButton(onClick = onDismiss) { Text(context.getString(R.string.main_annuler)) }
             }
         },
         shape = RoundedCornerShape(29.dp)

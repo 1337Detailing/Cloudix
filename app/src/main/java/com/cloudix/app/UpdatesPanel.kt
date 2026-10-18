@@ -19,15 +19,15 @@ fun UpdatesPanel() {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val scope = rememberCoroutineScope()
-    var state by remember { mutableStateOf("Les nouvelles builds GitHub sont publiées automatiquement. Aucun secret à configurer.") }
+    var state by remember { mutableStateOf(context.getString(R.string.update_les_nouvelles_builds_github_sont_publiees_aut)) }
     var candidate by remember { mutableStateOf<CloudixUpdateInfo?>(null) }
     var downloaded by remember { mutableStateOf<File?>(null) }
     var checking by remember { mutableStateOf(false) }
     var progress by remember { mutableIntStateOf(-1) }
     var missingChannel by remember { mutableStateOf(false) }
-    SectionTitle("Mises à jour", "Canal debug")
+    SectionTitle(context.getString(R.string.update_mises_a_jour), context.getString(R.string.update_canal_debug))
     SettingItem(Icons.Rounded.SystemUpdateAlt,
-        "Version installée", "Build ${CloudixUpdater.currentVersionCode(context)}")
+        context.getString(R.string.update_version_installee), "Build ${CloudixUpdater.currentVersionCode(context)}")
     Text(state, style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant)
     Spacer(Modifier.height(8.dp))
@@ -48,17 +48,17 @@ fun UpdatesPanel() {
                 if (update.versionCode > CloudixUpdater.currentVersionCode(context)) {
                     candidate = update
                     state = "Nouvelle build : ${update.title} (n° ${update.versionCode})."
-                } else state = "Aucune build plus récente."
+                } else state = context.getString(R.string.update_aucune_build_plus_recente)
             } catch (e: Exception) {
                 missingChannel = e.message?.contains("404") == true
-                state = e.message ?: "Vérification impossible."
+                state = e.message ?: context.getString(R.string.update_verification_impossible)
             }
             finally { checking = false }
         }
     }) {
         Icon(Icons.Rounded.Refresh, null)
         Spacer(Modifier.width(8.dp))
-        Text("Rechercher les builds GitHub")
+        Text(context.getString(R.string.update_rechercher_les_builds_github))
     }
     if (missingChannel) {
         OutlinedButton(onClick = {
@@ -66,10 +66,10 @@ fun UpdatesPanel() {
         }) {
             Icon(Icons.Rounded.Info, null)
             Spacer(Modifier.width(8.dp))
-            Text("Ouvrir les builds GitHub")
+            Text(context.getString(R.string.update_ouvrir_les_builds_github))
         }
         Text(
-            "La release de mise à jour n'est pas encore disponible. GitHub la publie automatiquement après une compilation réussie. Si tu utilises une ancienne APK avec une autre signature, Android peut exiger une dernière réinstallation.",
+            context.getString(R.string.update_la_release_de_mise_a_jour_n_est_pas_encore_di),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -85,27 +85,27 @@ fun UpdatesPanel() {
                         downloaded = withContext(Dispatchers.IO) {
                             CloudixUpdater.download(context, info) { progress = it }
                         }
-                        state = "APK vérifiée : SHA-256 et certificat Android conformes."
+                        state = context.getString(R.string.update_apk_verifiee_sha_256_et_certificat_android_co)
                     } catch (e: Exception) {
-                        state = e.message ?: "Téléchargement impossible"
+                        state = e.message ?: context.getString(R.string.update_telechargement_impossible)
                         progress = -1
                     } finally { checking = false }
                 }
             }) {
                 Icon(Icons.Rounded.Download, null)
                 Spacer(Modifier.width(8.dp))
-                Text("Télécharger et vérifier")
+                Text(context.getString(R.string.update_telecharger_et_verifier))
             }
         } else {
             Button(onClick = {
                 try {
                     val started = CloudixUpdater.install(context, downloaded!!)
-                    if (!started) state = "Autorise les APK provenant de Cloudix, puis reviens toucher Installer."
-                } catch (e: Exception) { state = e.message ?: "Installation impossible" }
+                    if (!started) state = context.getString(R.string.update_autorise_les_apk_provenant_de_cloudix_puis_re)
+                } catch (e: Exception) { state = e.message ?: context.getString(R.string.update_installation_impossible) }
             }) {
                 Icon(Icons.Rounded.InstallMobile, null)
                 Spacer(Modifier.width(8.dp))
-                Text("Installer la mise à jour")
+                Text(context.getString(R.string.update_installer_la_mise_a_jour))
             }
         }
     }

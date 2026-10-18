@@ -18,7 +18,7 @@ class AppearanceModelsTest {
     @Test fun presetsAreUniqueAndValid() {
         val presets = CloudixAppearanceCatalog.presets
         assertTrue(presets.size >= 30)
-        assertEquals(presets.size, presets.map { it.label }.distinct().size)
+        assertEquals(presets.size, presets.map { it.labelRes }.distinct().size)
         presets.forEach { assertEquals(it.hex, CloudixHex.normalize(it.hex)) }
     }
 
