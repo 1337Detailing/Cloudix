@@ -118,7 +118,7 @@ class CloudixSettings(private val context: Context) {
 
     fun setColorOverride(role: CloudixColorRole, value: String?) {
         val normalized = value?.let { CloudixHex.normalize(it) }
-        require(value == null || normalized != null) { "Code couleur invalide : utilise #RRGGBB" }
+        require(value == null || normalized != null) { context.getString(R.string.settings_bad_hex) }
         val overrides = appearance.overrides.toMutableMap()
         if (normalized == null) overrides.remove(role.key) else overrides[role.key] = normalized
         updateAppearance(appearance.copy(overrides = overrides))
@@ -137,7 +137,7 @@ class CloudixSettings(private val context: Context) {
         get() = prefs.getString("tailscale_address", "") ?: ""
         set(value) {
             require(value.isBlank() || CloudixTailnet.isTailnetIpv4(value)) {
-                "Adresse Tailscale invalide (100.64.0.0/10)"
+                context.getString(R.string.settings_bad_vpn)
             }
             prefs.edit().putString("tailscale_address", value).apply()
         }
@@ -260,7 +260,7 @@ class CloudixSettings(private val context: Context) {
                 GCMParameterSpec(128, data.copyOfRange(0, 12)))
             cipher.doFinal(data.copyOfRange(12, data.size)).toString(Charsets.UTF_8)
         } catch (e: Exception) {
-            throw IllegalStateException("Identifiants Cloudix illisibles : réappaire cet appareil", e)
+            throw IllegalStateException(context.getString(R.string.settings_credentials_error), e)
         }
     }
     fun secret(): String {

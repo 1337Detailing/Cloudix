@@ -74,7 +74,7 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
     override suspend fun doWork(): Result {
         val settings = CloudixSettings(applicationContext)
         if (settings.peer.isBlank() || settings.backupFolders.isEmpty()) {
-            val reason = "Aucun serveur appairé ou aucun dossier de sauvegarde sélectionné."
+            val reason = applicationContext.getString(R.string.backup_missing_configuration)
             settings.lastBackupError = reason
             return Result.failure(workDataOf("error" to reason))
         }
@@ -86,7 +86,7 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             // Verify the actual route from inside the Worker, not only the UI.
             // Tailscale is available to workers through Android's VPN network stack.
             client.ping()
-            setProgress(workDataOf("phase" to "Analyse des dossiers...", "uploaded" to 0))
+            setProgress(workDataOf("phase" to applicationContext.getString(R.string.backup_scanning), "uploaded" to 0))
             val state = settings.backupState()
             val device = safeName(settings.backupDeviceName)
             ensure(client, "", "Backups")
@@ -136,7 +136,7 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                             if (uploaded >= 4000) {
                                 settings.lastBackupItems = uploaded
                                 settings.lastBackupError =
-                                    "Sauvegarde partielle : $uploaded fichiers transférés. Reprise prévue automatiquement."
+                                    applicationContext.getString(R.string.backup_partial, uploaded)
                                 return Result.retry()
                             }
                             val input = applicationContext.contentResolver.openInputStream(item.uri)
@@ -144,7 +144,7 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                                 unreadableFiles++
                                 continue
                             }
-                            setProgress(workDataOf("phase" to "Transfert : ${name.take(60)}",
+                            setProgress(workDataOf("phase" to applicationContext.getString(R.string.backup_transferring, name.take(60)),
                                 "uploaded" to uploaded))
                             client.upload(remoteDir, name, size, input)
                             uploaded++
@@ -152,7 +152,7 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                             // Store state after confirmed HTTP success, never before.
                             state.put(id, stamp)
                             settings.saveBackupState(state)
-                            setProgress(workDataOf("phase" to "Sauvegarde en cours...",
+                            setProgress(workDataOf("phase" to applicationContext.getString(R.string.backup_working),
                                 "uploaded" to uploaded))
                         }
                     }
@@ -162,23 +162,19 @@ class BackupWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             if (skippedLargeOrUnknown > 0 || inaccessibleDepth ||
                 inaccessibleFolderCount > 0 || unreadableFiles > 0) {
                 settings.lastBackupError =
-                    "Sauvegarde incomplète : $skippedLargeOrUnknown fichiers trop volumineux/inconnus, " +
-                    "$unreadableFiles fichiers illisibles, $inaccessibleFolderCount dossiers non autorisés" +
-                    (if (inaccessibleDepth) ", arborescence trop profonde." else ".")
-                android.util.Log.w("CloudixBackup",
-                    settings.lastBackupError)
+                    applicationContext.getString(R.string.backup_incomplete)
                 Result.failure(workDataOf("error" to settings.lastBackupError,
                     "uploaded" to uploaded))
             } else {
                 settings.lastBackupAt = System.currentTimeMillis()
                 settings.lastBackupError = ""
-                setProgress(workDataOf("phase" to "Terminé", "uploaded" to uploaded))
+                setProgress(workDataOf("phase" to applicationContext.getString(R.string.backup_finished), "uploaded" to uploaded))
                 Result.success(workDataOf("uploaded" to uploaded))
             }
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             val detail = e.message?.take(210) ?: "connexion indisponible"
-            settings.lastBackupError = "Échec de sauvegarde : $detail"
+            settings.lastBackupError = applicationContext.getString(R.string.backup_failed, detail)
             if (runAttemptCount >= 5) {
                 Result.failure(workDataOf("error" to settings.lastBackupError))
             } else Result.retry()

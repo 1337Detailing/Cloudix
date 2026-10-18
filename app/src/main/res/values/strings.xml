@@ -404,4 +404,15 @@
     <string name="server_route_unknown">Route ou méthode inconnue</string>
     <string name="server_internal">Erreur interne</string>
     <string name="server_generic_error">Erreur</string>
+    <string name="backup_missing_configuration">Aucun serveur appairé ou aucun dossier de sauvegarde sélectionné.</string>
+    <string name="backup_scanning">Analyse des dossiers...</string>
+    <string name="backup_finished">Terminé</string>
+    <string name="backup_working">Sauvegarde en cours...</string>
+    <string name="settings_bad_hex">Code couleur invalide : utilise #RRGGBB</string>
+    <string name="settings_bad_vpn">Adresse Tailscale invalide (100.64.0.0/10)</string>
+    <string name="settings_credentials_error">Identifiants Cloudix illisibles : réappaire cet appareil</string>
+    <string name="backup_transferring">Transfert : %1$s</string>
+    <string name="backup_partial">Sauvegarde partielle : %1$d fichiers</string>
+    <string name="backup_failed">Sauvegarde échouée : %1$s</string>
+    <string name="backup_incomplete">Sauvegarde incomplète. Vérifie les dossiers.</string>
 </resources>
