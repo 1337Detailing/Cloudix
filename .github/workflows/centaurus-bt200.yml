@@ -19,8 +19,9 @@ jobs:
           gradle-version: '8.11.1'
       - name: Install Android platform
         run: |
-          sdkmanager --version
-          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
+          /usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager --sdk_root=/usr/local/lib/android/sdk 'platforms;android-35' 'build-tools;35.0.0'
       - name: Assemble
         run: gradle --no-daemon :app:assembleDebug
       - uses: actions/upload-artifact@v4
